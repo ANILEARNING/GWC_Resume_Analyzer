@@ -19,7 +19,8 @@ def fetch_data(url):
         return None
 
 def fetch_and_store_all_data(match_id):
-    base_url = "https://mYAA.in/wp-admin/admin.php?action=wpec_api_request&path=matches%2F{MatchId}%2F{Path}"
+    base_url = "https://mYAA.in/wp-admin/admin-ajax.php?action=wpec_api_request&path=matches%2F{MatchId}%2F{Path}"
+    # https://myfinal11.in/wp-admin/admin-ajax.php?action=wpec_api_request&path=matches%2F78132%2Flive
     paths = {
         "commentary_innings_1": "innings%2F1%2Fcommentary",
         "commentary_innings_2": "innings%2F2%2Fcommentary",

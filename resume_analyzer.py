@@ -105,8 +105,12 @@ def plot_extras_chart(df_statistics, placeholder):
 def main():
     st.title("Cricket Analyzer")
 
+    if 'all_data' not in st.session_state:
+        st.session_state.all_data = None
+        st.session_state.df_statistics = None
+
     match_ids = {
-        "MI Cape Town vs Joburg Super Kings": "82622",
+        "Match 1": "87106",
         "Match 2": "87107",
         "Match 3": "87108"
     }
@@ -119,31 +123,34 @@ def main():
             time.sleep(1)  # Simulate loading time
             all_data = fetch_and_store_all_data(match_id)
             df_commentary, df_wagon, df_statistics = create_dataframes(all_data)
+            st.session_state.all_data = all_data
+            st.session_state.df_statistics = df_statistics
             st.success("Data fetched and processed successfully!")
 
-            st.subheader("Visualizations")
+    if st.session_state.df_statistics is not None:
+        st.subheader("Visualizations")
 
-            chart_placeholder = st.empty()
+        chart_placeholder = st.empty()
 
-            if st.button("Manhattan Chart"):
-                with st.spinner("Loading Manhattan Chart..."):
-                    time.sleep(1)  # Simulate loading time
-                    plot_manhattan_chart(df_statistics, chart_placeholder)
+        if st.button("Manhattan Chart"):
+            with st.spinner("Loading Manhattan Chart..."):
+                time.sleep(1)  # Simulate loading time
+                plot_manhattan_chart(st.session_state.df_statistics, chart_placeholder)
 
-            if st.button("Worm Chart"):
-                with st.spinner("Loading Worm Chart..."):
-                    time.sleep(1)  # Simulate loading time
-                    plot_worm_chart(df_statistics, chart_placeholder)
+        if st.button("Worm Chart"):
+            with st.spinner("Loading Worm Chart..."):
+                time.sleep(1)  # Simulate loading time
+                plot_worm_chart(st.session_state.df_statistics, chart_placeholder)
 
-            if st.button("Run Rate Chart"):
-                with st.spinner("Loading Run Rate Chart..."):
-                    time.sleep(1)  # Simulate loading time
-                    plot_runrate_chart(df_statistics, chart_placeholder)
+        if st.button("Run Rate Chart"):
+            with st.spinner("Loading Run Rate Chart..."):
+                time.sleep(1)  # Simulate loading time
+                plot_runrate_chart(st.session_state.df_statistics, chart_placeholder)
 
-            if st.button("Extras Distribution"):
-                with st.spinner("Loading Extras Distribution..."):
-                    time.sleep(1)  # Simulate loading time
-                    plot_extras_chart(df_statistics, chart_placeholder)
+        if st.button("Extras Distribution"):
+            with st.spinner("Loading Extras Distribution..."):
+                time.sleep(1)  # Simulate loading time
+                plot_extras_chart(st.session_state.df_statistics, chart_placeholder)
 
 if __name__ == "__main__":
     main()

@@ -46,7 +46,7 @@ def create_dataframes(all_data):
     df_commentary_innings_1 = pd.DataFrame(all_data.get("commentary_innings_1", []))
     df_commentary_innings_2 = pd.DataFrame(all_data.get("commentary_innings_2", []))
     df_wagon = pd.DataFrame(all_data.get("wagon", []))
-    df_statistics = pd.DataFrame(all_data.get("statistics", []))
+    df_statistics = pd.DataFrame(all_data.get("statistics", {}).get("manhattan", []))
 
     df_combined_commentary = pd.concat([df_commentary_innings_1, df_commentary_innings_2], ignore_index=True)
 
@@ -54,7 +54,7 @@ def create_dataframes(all_data):
 
 def plot_manhattan_chart(df_statistics, placeholder):
     with placeholder.container():
-        if not df_statistics.empty:
+        if "over" in df_statistics and "runs" in df_statistics:
             plt.figure(figsize=(10, 5))
             plt.bar(df_statistics['over'], df_statistics['runs'], color='blue')
             plt.xlabel("Over")
@@ -62,11 +62,11 @@ def plot_manhattan_chart(df_statistics, placeholder):
             plt.title("Manhattan Chart")
             st.pyplot(plt)
         else:
-            st.warning("No data available for Manhattan Chart.")
+            st.warning("Required data for Manhattan Chart is missing.")
 
 def plot_worm_chart(df_statistics, placeholder):
     with placeholder.container():
-        if not df_statistics.empty:
+        if "over" in df_statistics and "cumulative_runs" in df_statistics:
             plt.figure(figsize=(10, 5))
             plt.plot(df_statistics['over'], df_statistics['cumulative_runs'], marker='o')
             plt.xlabel("Over")
@@ -74,11 +74,11 @@ def plot_worm_chart(df_statistics, placeholder):
             plt.title("Worm Chart")
             st.pyplot(plt)
         else:
-            st.warning("No data available for Worm Chart.")
+            st.warning("Required data for Worm Chart is missing.")
 
 def plot_runrate_chart(df_statistics, placeholder):
     with placeholder.container():
-        if not df_statistics.empty:
+        if "over" in df_statistics and "runrate" in df_statistics:
             plt.figure(figsize=(10, 5))
             plt.plot(df_statistics['over'], df_statistics['runrate'], marker='o', color='green')
             plt.xlabel("Over")
@@ -86,19 +86,22 @@ def plot_runrate_chart(df_statistics, placeholder):
             plt.title("Run Rate Chart")
             st.pyplot(plt)
         else:
-            st.warning("No data available for Run Rate Chart.")
+            st.warning("Required data for Run Rate Chart is missing.")
 
 def plot_extras_chart(df_statistics, placeholder):
     with placeholder.container():
         extras = df_statistics.get("extras", [])
         if extras:
             extras_df = pd.DataFrame(extras)
-            plt.figure(figsize=(10, 5))
-            plt.bar(extras_df['name'], extras_df['value'], color='orange')
-            plt.xlabel("Extra Types")
-            plt.ylabel("Count")
-            plt.title("Extras Distribution")
-            st.pyplot(plt)
+            if "name" in extras_df and "value" in extras_df:
+                plt.figure(figsize=(10, 5))
+                plt.bar(extras_df['name'], extras_df['value'], color='orange')
+                plt.xlabel("Extra Types")
+                plt.ylabel("Count")
+                plt.title("Extras Distribution")
+                st.pyplot(plt)
+            else:
+                st.warning("Extras data is incomplete.")
         else:
             st.warning("No data available for Extras Distribution.")
 
@@ -126,6 +129,12 @@ def main():
             st.session_state.all_data = all_data
             st.session_state.df_statistics = df_statistics
             st.success("Data fetched and processed successfully!")
+
+            st.subheader("Fetched Data")
+            st.write("### Statistics Data")
+            st.dataframe(df_statistics)
+            st.write("### Commentary Data")
+            st.dataframe(df_commentary)
 
     if st.session_state.df_statistics is not None:
         st.subheader("Visualizations")

@@ -1,4 +1,6 @@
-streamlit
-requests
 pandas
+wikipedia-api
+streamlit
 matplotlib
+seaborn
+

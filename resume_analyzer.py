@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 import wikipediaapi
 from datetime import datetime
 import re
@@ -11,20 +10,14 @@ from plotly.subplots import make_subplots
 # Set page configuration
 st.set_page_config(layout="wide", page_title="Olympic Archery Analytics")
 
-# Custom CSS with mode-independent colors
+# Custom CSS
 st.markdown("""
     <style>
     .main {
         padding: 2rem;
     }
-    .filter-section {
-        background-color: rgba(128, 128, 128, 0.1);
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin-bottom: 1rem;
-    }
     .stSelectbox, .stRadio {
-        background-color: rgba(128, 128, 128, 0.1);
+        background-color: #f0f2f6;
         padding: 1rem;
         border-radius: 0.5rem;
     }
@@ -32,25 +25,15 @@ st.markdown("""
         color: #1f77b4;
     }
     .metric-card {
-        background-color: rgba(128, 128, 128, 0.1);
+        background-color: #ffffff;
         padding: 1rem;
         border-radius: 0.5rem;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    .logo-img {
-        max-width: 50px;
-        float: left;
-        margin-right: 10px;
-    }
     </style>
 """, unsafe_allow_html=True)
 
-# Add small logo
-st.markdown("""
-    <img src='https://raw.githubusercontent.com/GWC_Resume_Analyzer/vb-logo.png' class='logo-img'/>
-""", unsafe_allow_html=True)
-
-# Functions remain the same
+# Functions remain the same as in your original code
 def get_dob_from_wikipedia(athlete_name):
     """Fetch the athlete's Date of Birth (DOB) from Wikipedia."""
     user_agent = "OlympicDataFetcher/1.0 (your-email@example.com)"
@@ -75,37 +58,18 @@ def calculate_age(dob, olympic_year):
     dob_date = datetime.strptime(dob, "%Y-%m-%d")
     return olympic_year - dob_date.year
 
-def generate_age_distribution_interpretation(df):
-    """Generate interpretation text for age distribution."""
-    female_stats = df[df['Sex'] == 'F']['Age'].describe()
-    male_stats = df[df['Sex'] == 'M']['Age'].describe()
-    
-    interpretation = f"""
-    #### Age Distribution Interpretation:
-    - Female athletes show a median age of {female_stats['50%']:.1f} years
-      - Most concentrated between {female_stats['25%']:.1f} and {female_stats['75%']:.1f} years
-    - Male athletes show a median age of {male_stats['50%']:.1f} years
-      - Most concentrated between {male_stats['25%']:.1f} and {male_stats['75%']:.1f} years
-    """
-    
-    # Add comparison
-    if female_stats['50%'] > male_stats['50%']:
-        interpretation += "\n- Female athletes tend to be slightly older in this dataset"
-    else:
-        interpretation += "\n- Male athletes tend to be slightly older in this dataset"
-        
-    return interpretation
-
-# Load and prepare data (same as before)
+# Load and prepare data
 @st.cache_data
 def load_data():
     df = pd.read_csv("athlete_events.csv")
     df = df[(df["Sport"] == "Archery") & (df["Medal"].notna())]
     
+    # Create Team/Individual column
     df['Event_Type'] = df['Event'].apply(
         lambda x: 'Team' if any(word in x.lower() for word in ['team', 'double']) else 'Individual'
     )
     
+    # Handle missing ages (your existing code for age imputation)
     df_missing_age = df[df["Age"].isna()]
     for index, row in df_missing_age.iterrows():
         dob = get_dob_from_wikipedia(row["Name"])
@@ -113,11 +77,7 @@ def load_data():
             age = calculate_age(dob, row["Year"])
             df.at[index, "Age"] = age
     
-    # df["Age"].fillna(round(df["Age"].mean()), inplace=True)
-    # Impute Remaining Missing Ages with Mean Age by Gender
-    df.loc[df["Age"].isna() & (df["Sex"] == "M"), "Age"] = round(df[df["Sex"] == "M"]["Age"].mean())
-    df.loc[df["Age"].isna() & (df["Sex"] == "F"), "Age"] = round(df[df["Sex"] == "F"]["Age"].mean())
-
+    df["Age"].fillna(df["Age"].mean(), inplace=True)
     return df
 
 # Load data
@@ -127,42 +87,39 @@ df = load_data()
 st.title("🏹 Olympic Archery Analytics Dashboard")
 st.markdown("---")
 
-# Filters with improved visibility
-with st.container():
-    st.markdown('<div class="filter-section">', unsafe_allow_html=True)
-    col1, col2, col3, col4 = st.columns(4)
+# Filters in main content area
+col1, col2, col3, col4 = st.columns(4)
 
-    with col1:
-        years = sorted(df["Year"].unique())
-        selected_year = st.selectbox(
-            "Select Olympic Year",
-            ["All"] + list(years),
-            index=0
-        )
+with col1:
+    years = sorted(df["Year"].unique())
+    selected_year = st.selectbox(
+        "Select Olympic Year",
+        ["All"] + list(years),
+        index=0
+    )
 
-    with col2:
-        selected_gender = st.radio(
-            "Select Gender",
-            ["Both", "M", "F"],
-            horizontal=True
-        )
+with col2:
+    selected_gender = st.radio(
+        "Select Gender",
+        ["Both", "M", "F"],
+        horizontal=True
+    )
 
-    with col3:
-        event_types = df["Event_Type"].unique()
-        selected_event = st.selectbox(
-            "Select Event Type",
-            ["All"] + list(event_types)
-        )
+with col3:
+    event_types = df["Event_Type"].unique()
+    selected_event = st.selectbox(
+        "Select Event Type",
+        ["All"] + list(event_types)
+    )
 
-    with col4:
-        seasons = df["Season"].unique()
-        selected_season = st.selectbox(
-            "Select Season",
-            ["All"] + list(seasons)
-        )
-    st.markdown('</div>', unsafe_allow_html=True)
+with col4:
+    seasons = df["Season"].unique()
+    selected_season = st.selectbox(
+        "Select Season",
+        ["All"] + list(seasons)
+    )
 
-# Filter data
+# Filter data based on selections
 filtered_df = df.copy()
 if selected_year != "All":
     filtered_df = filtered_df[filtered_df["Year"] == selected_year]
@@ -188,37 +145,33 @@ with metric_col3:
 with metric_col4:
     st.metric("Age Range", f"{filtered_df['Age'].min():.0f} - {filtered_df['Age'].max():.0f}")
 
-# Enhanced Age Distribution Chart
+# Age Distribution Chart (similar to the image)
 st.markdown("### 🎯 Age Distribution by Gender")
 
-# Create mirrored histogram with age labels
-fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.02,
+# Create mirrored histogram
+fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.02, 
                     row_heights=[0.5, 0.5])
-
-# Add age labels
-age_ticks = list(range(20, 55, 10))
 
 # Female distribution (top)
 female_df = filtered_df[filtered_df["Sex"] == "F"]
-female_hist = np.histogram(female_df["Age"], bins=30)
 fig.add_trace(
-    go.Bar(x=female_hist[1][:-1], y=female_hist[0],
+    go.Bar(x=female_df["Age"].value_counts().sort_index().index,
+           y=female_df["Age"].value_counts().sort_index().values,
            name="Female",
            marker_color="#FF69B4"),
     row=1, col=1
 )
 
-# Male distribution (bottom, positive values)
+# Male distribution (bottom, negative values)
 male_df = filtered_df[filtered_df["Sex"] == "M"]
-male_hist = np.histogram(male_df["Age"], bins=30)
 fig.add_trace(
-    go.Bar(x=male_hist[1][:-1], y=male_hist[0],
+    go.Bar(x=male_df["Age"].value_counts().sort_index().index,
+           y=-male_df["Age"].value_counts().sort_index().values,
            name="Male",
            marker_color="#4169E1"),
     row=2, col=1
 )
 
-# Update layout with age labels
 fig.update_layout(
     height=600,
     showlegend=True,
@@ -228,71 +181,29 @@ fig.update_layout(
     yaxis2_title="Male Count"
 )
 
-# Add age labels
-for age in age_ticks:
-    fig.add_annotation(x=age, y=0, text=str(age),
-                      showarrow=False, yshift=10)
-
 st.plotly_chart(fig, use_container_width=True)
 
-# Add interpretation
-st.markdown(generate_age_distribution_interpretation(filtered_df))
+# Additional visualizations
+col1, col2 = st.columns(2)
 
-# Enhanced Age Trends visualization
-st.markdown("### 📈 Age Trends Over Time")
-st.markdown("""
-**How to interpret:**
-- Each box shows the age distribution for a specific year
-- The middle line is the median age
-- The box shows the 25th to 75th percentile range
-- Whiskers show the full range excluding outliers
-- Points show individual outliers
-""")
+with col1:
+    st.markdown("### 📈 Age Trends Over Time")
+    age_trends = px.box(filtered_df, x="Year", y="Age", color="Sex",
+                       title="Age Distribution Across Olympics")
+    st.plotly_chart(age_trends, use_container_width=True)
 
-age_trends = px.box(filtered_df, x="Year", y="Age", color="Sex",
-                    title="Age Distribution Across Olympics")
-age_trends.update_layout(
-    xaxis_title="Olympic Year",
-    yaxis_title="Age",
-    hoverlabel=dict(bgcolor="white"),
-)
+with col2:
+    st.markdown("### 🏅 Medal Distribution by Age Group")
+    filtered_df["Age_Group"] = pd.cut(filtered_df["Age"], 
+                                    bins=[0, 20, 25, 30, 35, 100],
+                                    labels=["Under 20", "20-25", "26-30", "31-35", "Over 35"])
+    
+    medal_dist = px.bar(filtered_df, x="Age_Group", color="Medal",
+                       title="Medals by Age Group",
+                       category_orders={"Medal": ["Gold", "Silver", "Bronze"]})
+    st.plotly_chart(medal_dist, use_container_width=True)
 
-# Add trend lines
-for gender in filtered_df["Sex"].unique():
-    gender_data = filtered_df[filtered_df["Sex"] == gender]
-    z = np.polyfit(gender_data["Year"], gender_data["Age"], 1)
-    p = np.poly1d(z)
-    age_trends.add_scatter(x=gender_data["Year"].unique(), 
-                          y=p(gender_data["Year"].unique()),
-                          name=f"{gender} Trend",
-                          line=dict(dash='dash'))
-
-st.plotly_chart(age_trends, use_container_width=True)
-
-# Enhanced Medal Distribution
-st.markdown("### 🏅 Medal Distribution by Age Group")
-st.markdown("""
-**How to interpret:**
-- Each bar represents an age group
-- Colors show different medal types
-- Height shows the count of medals
-- Hover over bars to see exact counts
-""")
-
-filtered_df["Age_Group"] = pd.cut(filtered_df["Age"],
-                                bins=[0, 20, 25, 30, 35, 100],
-                                labels=["Under 20", "20-25", "26-30", "31-35", "Over 35"])
-
-medal_dist = px.bar(filtered_df, x="Age_Group", color="Medal",
-                   title="Medals by Age Group",
-                   category_orders={"Medal": ["Gold", "Silver", "Bronze"]})
-
-# Add value labels
-medal_dist.update_traces(texttemplate='%{y}', textposition='inside')
-
-st.plotly_chart(medal_dist, use_container_width=True)
-
-# Enhanced Statistical Insights
+# Enhanced Interpretation
 st.markdown("### 📋 Statistical Insights")
 col1, col2 = st.columns(2)
 
@@ -308,42 +219,33 @@ with col1:
     - **Most Common Age:** {mode_age:.0f} years
     """)
     
-    # Dynamic interpretation based on filtered data
-    if len(filtered_df) > 0:
-        if mean_age < 25:
-            st.write("The selected data shows a younger athlete population.")
-        elif mean_age < 30:
-            st.write("Athletes in their prime (25-30) dominate the selected data.")
-        else:
-            st.write("The selected data shows strong presence of experienced athletes.")
+    if mean_age < 25:
+        st.write("The data suggests a younger athlete population dominates the sport.")
+    elif mean_age < 30:
+        st.write("Athletes in their prime (25-30) show strong representation.")
+    else:
+        st.write("Experience appears to be a significant factor with older athletes showing strong presence.")
 
 with col2:
     st.markdown("#### Gender Analysis")
-    if len(filtered_df) > 0:
-        gender_counts = filtered_df["Sex"].value_counts()
-        total_athletes = len(filtered_df)
-        
-        st.write(f"""
-        - **Female Athletes:** {gender_counts.get('F', 0)} ({(gender_counts.get('F', 0) / total_athletes * 100):.1f}%)
-        - **Male Athletes:** {gender_counts.get('M', 0)} ({(gender_counts.get('M', 0) / total_athletes * 100):.1f}%)
-        """)
-        
-        # Gender-specific age insights
-        female_mean = filtered_df[filtered_df["Sex"] == "F"]["Age"].mean()
-        male_mean = filtered_df[filtered_df["Sex"] == "M"]["Age"].mean()
-        
-        if not pd.isna(female_mean):
-            st.write(f"- **Average Female Age:** {female_mean:.1f} years")
-        if not pd.isna(male_mean):
-            st.write(f"- **Average Male Age:** {male_mean:.1f} years")
-    else:
-        st.write("No data available for the selected filters")
+    gender_counts = filtered_df["Sex"].value_counts()
+    st.write(f"""
+    - **Female Athletes:** {gender_counts.get('F', 0)} ({(gender_counts.get('F', 0) / len(filtered_df) * 100):.1f}%)
+    - **Male Athletes:** {gender_counts.get('M', 0)} ({(gender_counts.get('M', 0) / len(filtered_df) * 100):.1f}%)
+    """)
+    
+    # Gender-specific age insights
+    female_mean = filtered_df[filtered_df["Sex"] == "F"]["Age"].mean()
+    male_mean = filtered_df[filtered_df["Sex"] == "M"]["Age"].mean()
+    st.write(f"""
+    - **Average Female Age:** {female_mean:.1f} years
+    - **Average Male Age:** {male_mean:.1f} years
+    """)
 
 # Display filtered data
 st.markdown("### 📋 Detailed Data View")
 st.dataframe(filtered_df[["Name", "Sex", "Age", "Year", "Event", "Medal", "Event_Type", "Season"]])
 
-# ```
 
 # Key improvements made in this updated version:
 

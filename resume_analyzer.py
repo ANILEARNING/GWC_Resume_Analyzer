@@ -186,15 +186,15 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # Additional visualizations
-col1, col2 = st.columns(2)
+# col1, col2 = st.columns(2)
 
-with col1:
-    st.markdown("### 📈 Age Trends Over Time")
-    age_trends = px.box(filtered_df, x="Year", y="Age", color="Sex",
-                       title="Age Distribution Across Olympics")
-    st.plotly_chart(age_trends, use_container_width=True)
+# with col1:
+st.markdown("### 📈 Age Trends Over Time")
+age_trends = px.box(filtered_df, x="Year", y="Age", color="Sex",
+                    title="Age Distribution Across Olympics")
+st.plotly_chart(age_trends, use_container_width=True)
 
-with col2:
+# with col2:
     # st.markdown("### 🏅 Medal Distribution by Age Group")
     # filtered_df["Age_Group"] = pd.cut(filtered_df["Age"], 
     #                                 bins=[0, 20, 25, 30, 35, 100],
@@ -204,21 +204,21 @@ with col2:
     #                    title="Medals by Age Group",
     #                    category_orders={"Medal": ["Gold", "Silver", "Bronze"]})
     # st.plotly_chart(medal_dist, use_container_width=True)
-    st.markdown("### 🏅 Medal Distribution by Age Group")
-    
-    filtered_df["Age_Group"] = pd.cut(filtered_df["Age"], 
-                                      bins=[0, 20, 25, 30, 35, 100],
-                                      labels=["Under 20", "20-25", "26-30", "31-35", "Over 35"])
-    
-    medal_dist = px.bar(
-        filtered_df, x="Age_Group", color="Medal",
-        title="Medals by Age Group",
-        category_orders={"Medal": ["Gold", "Silver", "Bronze"]},  # Medal order
-        text_auto=True,  # 📊 Display count numbers on bars
-        color_discrete_map={"Gold": "#FFD700", "Silver": "#C0C0C0", "Bronze": "#CD7F32"}  # 🎨 Medal colors
-    )
-    
-    st.plotly_chart(medal_dist, use_container_width=True)
+st.markdown("### 🏅 Medal Distribution by Age Group")
+
+filtered_df["Age_Group"] = pd.cut(filtered_df["Age"], 
+                                    bins=[0, 20, 25, 30, 35, 100],
+                                    labels=["Under 20", "20-25", "26-30", "31-35", "Over 35"])
+
+medal_dist = px.bar(
+    filtered_df, x="Age_Group", color="Medal",
+    title="Medals by Age Group",
+    category_orders={"Medal": ["Gold", "Silver", "Bronze"]},  # Medal order
+    text_auto=True,  # 📊 Display count numbers on bars
+    color_discrete_map={"Gold": "#FFD700", "Silver": "#C0C0C0", "Bronze": "#CD7F32"}  # 🎨 Medal colors
+)
+
+st.plotly_chart(medal_dist, use_container_width=True)
 
 # Enhanced Interpretation
 st.markdown("### 📋 Statistical Insights")

@@ -77,7 +77,10 @@ def load_data():
             age = calculate_age(dob, row["Year"])
             df.at[index, "Age"] = age
     
-    df["Age"].fillna(df["Age"].mean(), inplace=True)
+    # df["Age"].fillna(df["Age"].mean(), inplace=True)
+    df.loc[df["Age"].isna() & (df["Sex"] == "M"), "Age"] = round(df[df["Sex"] == "M"]["Age"].mean())
+    df.loc[df["Age"].isna() & (df["Sex"] == "F"), "Age"] = round(df[df["Sex"] == "F"]["Age"].mean())
+
     return df
 
 # Load data

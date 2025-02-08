@@ -3,5 +3,5 @@ wikipedia-api
 streamlit
 matplotlib
 seaborn
-ploty
+plotly
 

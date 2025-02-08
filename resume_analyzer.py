@@ -205,18 +205,34 @@ st.plotly_chart(age_trends, use_container_width=True)
     #                    category_orders={"Medal": ["Gold", "Silver", "Bronze"]})
     # st.plotly_chart(medal_dist, use_container_width=True)
 st.markdown("### 🏅 Medal Distribution by Age Group")
-
+    
 filtered_df["Age_Group"] = pd.cut(filtered_df["Age"], 
                                     bins=[0, 20, 25, 30, 35, 100],
                                     labels=["Under 20", "20-25", "26-30", "31-35", "Over 35"])
 
+# Group by Age_Group and Medal, then count medals
+medal_counts = filtered_df.groupby(["Age_Group", "Medal"]).size().reset_index(name="count")
+
+# Calculate total medals per Age_Group
+total_medals = medal_counts.groupby("Age_Group")["count"].sum().reset_index()
+total_medals_dict = dict(zip(total_medals["Age_Group"], total_medals["count"]))  # Dictionary for annotation
+
+# Create bar chart
 medal_dist = px.bar(
-    filtered_df, x="Age_Group", color="Medal",
+    medal_counts, x="Age_Group", y="count", color="Medal",
     title="Medals by Age Group",
     category_orders={"Medal": ["Gold", "Silver", "Bronze"]},  # Medal order
-    text_auto=True,  # 📊 Display count numbers on bars
-    color_discrete_map={"Gold": "#FFD700", "Silver": "#C0C0C0", "Bronze": "#CD7F32"}  # 🎨 Medal colors
+    text=medal_counts["count"],  # Show medal count inside bars
+    color_discrete_map={"Gold": "#FFD700", "Silver": "#C0C0C0", "Bronze": "#CD7F32"}  # Medal colors
 )
+
+# Add total medal count on top of each bar
+for age_group, total in total_medals_dict.items():
+    medal_dist.add_annotation(
+        x=age_group, y=total + 1,  # Position above bar
+        text=str(total), showarrow=False,
+        font=dict(size=14, color="black")
+    )
 
 st.plotly_chart(medal_dist, use_container_width=True)
 

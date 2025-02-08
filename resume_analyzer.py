@@ -132,17 +132,19 @@ if selected_season != "All":
 
 # Key Metrics
 st.markdown("### 📊 Key Metrics")
-metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+metric_col1, metric_col2, metric_col3, metric_col4, metric_col5 = st.columns(5)
 
 with metric_col1:
-    st.metric("Total Athletes", len(filtered_df["Name"].unique()))
+    st.metric("Unique Athletes", len(filtered_df["Name"].unique()))
 with metric_col2:
+    st.metric("Medalist Count", len(filtered_df["Name"]))
+with metric_col3:
     gender_ratio = filtered_df["Sex"].value_counts(normalize=True)
     female_pct = gender_ratio.get("F", 0) * 100
     st.metric("Female Athletes", f"{female_pct:.1f}%")
-with metric_col3:
-    st.metric("Average Age", f"{filtered_df['Age'].mean():.1f}")
 with metric_col4:
+    st.metric("Average Age", f"{filtered_df['Age'].mean():.1f}")
+with metric_col5:
     st.metric("Age Range", f"{filtered_df['Age'].min():.0f} - {filtered_df['Age'].max():.0f}")
 
 # Age Distribution Chart (similar to the image)

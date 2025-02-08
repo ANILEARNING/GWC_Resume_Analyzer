@@ -79,6 +79,12 @@ if selected_event != "All":
 if selected_season != "All":
     filtered_df = filtered_df[filtered_df["Season"] == selected_season]
 
+# Metrics
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Medalists", len(filtered_df))
+col2.metric("Average Age", f"{filtered_df['Age'].mean():.1f} years")
+col3.metric("Most Common Age", f"{filtered_df['Age'].mode().iloc[0]:.0f} years")
+
 # Age Distribution Chart
 st.markdown("### 🎯 Age Distribution by Gender")
 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.02, row_heights=[0.5, 0.5])

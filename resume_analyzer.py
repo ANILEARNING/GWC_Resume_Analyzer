@@ -5,6 +5,7 @@ import re
 import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
+import plotly.express as px
 
 # ------------------------------
 # 📌 Function to Fetch DOB from Wikipedia
@@ -14,7 +15,7 @@ def get_dob_from_wikipedia(athlete_name):
     Fetch the athlete's Date of Birth (DOB) from Wikipedia.
     """
     user_agent = "OlympicDataFetcher/1.0 (your-email@example.com)"  # Replace with your email
-    wiki_wiki = wikipediaapi.Wikipedia(user_agent, "en")  # Corrected order
+    wiki_wiki = wikipediaapi.Wikipedia(user_agent, "en")
 
     # Fetch Wikipedia page
     page = wiki_wiki.page(athlete_name)
@@ -50,6 +51,9 @@ def calculate_age(dob, olympic_year):
 df = pd.read_csv("athlete_events.csv")  # Replace with your dataset
 df = df[(df["Sport"] == "Archery") & (df["Medal"].notna())]  # Filter Archery medalists
 
+# Remove team events
+df = df[~df["Event"].str.lower().str.contains("double|team", na=False)]
+
 # ------------------------------
 # 📌 Impute Missing Ages
 # ------------------------------
@@ -73,17 +77,138 @@ df["Age"].fillna(df["Age"].mean(), inplace=True)
 # ------------------------------
 st.title("🏹 Archery Olympic Medalists - Age Distribution")
 
-# 📊 Plot Age Distribution by Gender
-fig, ax = plt.subplots(figsize=(8, 5))
-sns.histplot(data=df, x="Age", hue="Sex", kde=True, bins=15, ax=ax, palette={"M": "blue", "F": "purple"})
-plt.xlabel("Age")
-plt.ylabel("Count")
-plt.title("Age Distribution of Archery Medalists")
-st.pyplot(fig)
+# Sidebar Filters
+years = sorted(df["Year"].unique())
+genders = df["Sex"].unique()
+selected_year = st.sidebar.selectbox("Select Olympic Year", years, index=len(years)-1)
+selected_gender = st.sidebar.radio("Select Gender", ["Both"] + list(genders))
+
+# Apply Filters
+filtered_df = df[df["Year"] == selected_year]
+if selected_gender != "Both":
+    filtered_df = filtered_df[filtered_df["Sex"] == selected_gender]
+
+# 📊 Interactive Age Distribution Plot
+fig = px.histogram(
+    filtered_df, x="Age", color="Sex", barmode="overlay",
+    title=f"Age Distribution of Archery Medalists ({selected_year})",
+    labels={"Age": "Age", "count": "Number of Athletes"},
+    color_discrete_map={"M": "blue", "F": "purple"}
+)
+st.plotly_chart(fig)
+
+# 📌 Further Insights
+st.subheader("📊 Age Insights")
+mean_age = filtered_df["Age"].mean()
+median_age = filtered_df["Age"].median()
+age_range = (filtered_df["Age"].min(), filtered_df["Age"].max())
+
+st.write(f"**Mean Age:** {mean_age:.2f} years")
+st.write(f"**Median Age:** {median_age:.2f} years")
+st.write(f"**Age Range:** {age_range[0]} - {age_range[1]} years")
+
+# 📌 Interpretation
+st.subheader("📖 Interpretation")
+if mean_age < 25:
+    st.write("Younger athletes tend to dominate Archery events, with a mean age below 25 years.")
+elif mean_age < 30:
+    st.write("The prime age for Archery medalists is typically between 25-30 years.")
+else:
+    st.write("Older athletes (30+ years) are also highly competitive in Archery.")
 
 # 📌 Display Filtered Data
 st.subheader("Filtered Archery Medalist Data")
-st.dataframe(df)
+st.dataframe(filtered_df)
+
+
+################### Basic V1 ##########################
+
+# import pandas as pd
+# import wikipediaapi
+# from datetime import datetime
+# import re
+# import streamlit as st
+# import matplotlib.pyplot as plt
+# import seaborn as sns
+
+# # ------------------------------
+# # 📌 Function to Fetch DOB from Wikipedia
+# # ------------------------------
+# def get_dob_from_wikipedia(athlete_name):
+#     """
+#     Fetch the athlete's Date of Birth (DOB) from Wikipedia.
+#     """
+#     user_agent = "OlympicDataFetcher/1.0 (your-email@example.com)"  # Replace with your email
+#     wiki_wiki = wikipediaapi.Wikipedia(user_agent, "en")  # Corrected order
+
+#     # Fetch Wikipedia page
+#     page = wiki_wiki.page(athlete_name)
+
+#     if not page.exists():
+#         return None
+
+#     # Use regex to search for DOB in page text
+#     dob_match = re.search(r'Born.*?(\d{1,2} \w+ \d{4})', page.text)
+
+#     if dob_match:
+#         dob_str = dob_match.group(1)
+#         try:
+#             # Convert DOB string to 'YYYY-MM-DD' format
+#             dob_date = datetime.strptime(dob_str, "%d %B %Y")
+#             return dob_date.strftime("%Y-%m-%d")
+#         except ValueError:
+#             return None
+
+#     return None
+
+# # ------------------------------
+# # 📌 Function to Calculate Age
+# # ------------------------------
+# def calculate_age(dob, olympic_year):
+#     """Calculate age from DOB and Olympic year."""
+#     dob_date = datetime.strptime(dob, "%Y-%m-%d")
+#     return olympic_year - dob_date.year
+
+# # ------------------------------
+# # 📌 Load Dataset & Filter Archery Medalists
+# # ------------------------------
+# df = pd.read_csv("athlete_events.csv")  # Replace with your dataset
+# df = df[(df["Sport"] == "Archery") & (df["Medal"].notna())]  # Filter Archery medalists
+
+# # ------------------------------
+# # 📌 Impute Missing Ages
+# # ------------------------------
+# df_missing_age = df[df["Age"].isna()]
+
+# for index, row in df_missing_age.iterrows():
+#     athlete_name = row["Name"]
+#     olympic_year = row["Year"]
+
+#     # Fetch DOB & Calculate Age
+#     dob = get_dob_from_wikipedia(athlete_name)
+#     if dob:
+#         age = calculate_age(dob, olympic_year)
+#         df.at[index, "Age"] = age  # Update Age
+
+# # Impute Remaining Missing Ages with Mean Age
+# df["Age"].fillna(df["Age"].mean(), inplace=True)
+
+# # ------------------------------
+# # 📌 Streamlit App
+# # ------------------------------
+# st.title("🏹 Archery Olympic Medalists - Age Distribution")
+
+# # 📊 Plot Age Distribution by Gender
+# fig, ax = plt.subplots(figsize=(8, 5))
+# sns.histplot(data=df, x="Age", hue="Sex", kde=True, bins=15, ax=ax, palette={"M": "blue", "F": "purple"})
+# plt.xlabel("Age")
+# plt.ylabel("Count")
+# plt.title("Age Distribution of Archery Medalists")
+# st.pyplot(fig)
+
+# # 📌 Display Filtered Data
+# st.subheader("Filtered Archery Medalist Data")
+# st.dataframe(df)
 
 
 

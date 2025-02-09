@@ -25,6 +25,10 @@ def load_data():
     matched_athletes = merged_data.dropna(subset=['name_world'])
     matched_athletes['time_gap'] = matched_athletes['year_olympic'] - matched_athletes['year_world']
 
+    # Remove incorrect entries where time_gap is negative
+    matched_athletes = matched_athletes[matched_athletes['time_gap'] >= 0]
+
+
     return olympic_data, world_data, matched_athletes
 
 # Load Data
@@ -108,19 +112,6 @@ st.markdown("#### **📌 Interpretation**")
 st.write("""
 - The **peak performance age** for Olympic medalists is **25-30 years**.
 - Some archers succeed even in their **40s**, showing that experience matters.
-""")
-
-# Gender Distribution
-st.subheader("📊 Gender-Based Analysis")
-fig = px.bar(filtered_data, x='sex', color='medal_olympic', 
-             title="Olympic Medals by Gender",
-             labels={'sex': 'Gender', 'count': 'Number of Medals'})
-st.plotly_chart(fig)
-
-st.markdown("#### **📌 Interpretation**")
-st.write("""
-- Archery is **gender-balanced**, with both men and women winning medals.
-- If one gender dominates, it may indicate **higher participation or better training programs**.
 """)
 
 # Time Gap Distribution

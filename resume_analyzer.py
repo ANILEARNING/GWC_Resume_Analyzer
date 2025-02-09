@@ -1,180 +1,123 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-from scipy import stats
 import seaborn as sns
 import matplotlib.pyplot as plt
+from fuzzywuzzy import process
 
-# Set page configuration
-st.set_page_config(
-    page_title="Archery Performance Correlation Analysis",
-    page_icon="🎯",
-    layout="wide"
-)
-
-# Function to load and process data
+# Load datasets
+@st.cache_data
 def load_data():
-    # Load your datasets
-    concat_df = pd.read_csv("archery_championships_cleaned.csv")
-    olympic_df = pd.read_csv("individual_filtered_archery_data.csv")
-    
-    # Convert medals to numeric values for correlation analysis
-    medal_values = {'Gold': 3, 'Silver': 2, 'Bronze': 1}
-    concat_df['Medal_Value'] = concat_df['Medal'].map(medal_values)
-    olympic_df['Medal_Value'] = olympic_df['Medal'].map(medal_values)
-    
-    return concat_df, olympic_df
+    olympic_data = pd.read_csv("individual_filtered_archery_data.csv")  # Update with actual path
+    world_data = pd.read_csv("archery_championships_cleaned.csv")
 
-def calculate_performance_metrics(athlete_data):
-    """Calculate performance metrics for each athlete"""
-    metrics = {
-        'total_medals': len(athlete_data),
-        'gold_medals': len(athlete_data[athlete_data['Medal'] == 'Gold']),
-        'avg_performance': athlete_data['Medal_Value'].mean(),
-        'performance_trend': stats.linregress(range(len(athlete_data)), athlete_data['Medal_Value']).slope
-    }
-    return pd.Series(metrics)
+    # Standardize column names
+    olympic_data.columns = olympic_data.columns.str.strip().str.lower().str.replace(' ', '_')
+    world_data.columns = world_data.columns.str.strip().str.lower().str.replace(' ', '_')
 
-def main():
-    st.title("🎯 Archery Performance Correlation Analysis")
-    st.write("Analyzing correlation between Olympic medals and past championship performances")
-    
-    try:
-        # Load data
-        concat_df, olympic_df = load_data()
-        
-        # Sidebar filters
-        st.sidebar.header("Filters")
-        year_range = st.sidebar.slider(
-            "Select Year Range",
-            min_value=min(concat_df['Year'].min(), olympic_df['Year'].min()),
-            max_value=max(concat_df['Year'].max(), olympic_df['Year'].max()),
-            value=(1920, 2020)
-        )
-        
-        # Filter data based on year range
-        concat_filtered = concat_df[(concat_df['Year'] >= year_range[0]) & (concat_df['Year'] <= year_range[1])]
-        olympic_filtered = olympic_df[(olympic_df['Year'] >= year_range[0]) & (olympic_df['Year'] <= year_range[1])]
-        
-        # Create tabs for different analyses
-        tab1, tab2, tab3 = st.tabs(["Performance Overview", "Correlation Analysis", "Athlete Profiles"])
-        
-        # Tab 1: Performance Overview
-        with tab1:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.subheader("Medal Distribution Over Time")
-                fig_timeline = px.scatter(
-                    pd.concat([concat_filtered, olympic_filtered]),
-                    x='Year',
-                    y='Medal',
-                    color='Medal',
-                    size='Medal_Value',
-                    hover_data=['Name'],
-                    title='Medal Distribution Timeline'
-                )
-                st.plotly_chart(fig_timeline, use_container_width=True)
-            
-            with col2:
-                st.subheader("Performance Progression")
-                athlete_perf = pd.concat([
-                    concat_filtered.groupby('Name')['Medal_Value'].mean(),
-                    olympic_filtered.groupby('Name')['Medal_Value'].mean()
-                ]).reset_index()
-                
-                fig_progression = px.box(
-                    athlete_perf,
-                    y='Medal_Value',
-                    title='Performance Distribution'
-                )
-                st.plotly_chart(fig_progression, use_container_width=True)
-        
-        # Tab 2: Correlation Analysis
-        with tab2:
-            st.subheader("Performance Correlation Analysis")
-            
-            # Calculate pre-Olympic performance metrics
-            pre_olympic_metrics = concat_filtered.groupby('Name').apply(calculate_performance_metrics)
-            
-            # Calculate Olympic performance
-            olympic_performance = olympic_filtered.groupby('Name')['Medal_Value'].mean()
-            
-            # Merge metrics
-            correlation_data = pd.merge(
-                pre_olympic_metrics,
-                olympic_performance,
-                left_index=True,
-                right_index=True,
-                how='inner',
-                suffixes=('_pre', '_olympic')
-            )
-            
-            # Calculate correlations
-            correlation_matrix = correlation_data.corr()
-            
-            # Plot correlation heatmap
-            fig_corr = px.imshow(
-                correlation_matrix,
-                title='Performance Correlation Heatmap',
-                color_continuous_scale='RdBu'
-            )
-            st.plotly_chart(fig_corr, use_container_width=True)
-            
-            # Scatter plot of pre-Olympic vs Olympic performance
-            fig_scatter = px.scatter(
-                correlation_data,
-                x='avg_performance',
-                y='Medal_Value_olympic',
-                title='Pre-Olympic vs Olympic Performance',
-                trendline="ols",
-                labels={
-                    'avg_performance': 'Average Pre-Olympic Performance',
-                    'Medal_Value_olympic': 'Olympic Performance'
-                }
-            )
-            st.plotly_chart(fig_scatter, use_container_width=True)
-        
-        # Tab 3: Athlete Profiles
-        with tab3:
-            st.subheader("Individual Athlete Analysis")
-            
-            # Athlete selector
-            selected_athlete = st.selectbox(
-                "Select Athlete",
-                pd.concat([concat_filtered['Name'], olympic_filtered['Name']]).unique()
-            )
-            
-            # Get athlete's performance history
-            athlete_history = pd.concat([
-                concat_filtered[concat_filtered['Name'] == selected_athlete],
-                olympic_filtered[olympic_filtered['Name'] == selected_athlete]
-            ]).sort_values('Year')
-            
-            # Performance timeline
-            fig_athlete = px.line(
-                athlete_history,
-                x='Year',
-                y='Medal_Value',
-                title=f'Performance Timeline for {selected_athlete}',
-                markers=True
-            )
-            st.plotly_chart(fig_athlete, use_container_width=True)
-            
-            # Performance statistics
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total Medals", len(athlete_history))
-            with col2:
-                st.metric("Average Performance", round(athlete_history['Medal_Value'].mean(), 2))
-            with col3:
-                st.metric("Peak Performance Year", athlete_history.loc[athlete_history['Medal_Value'].idxmax(), 'Year'])
+    # Fuzzy match names
+    world_names = world_data['name'].dropna().unique()
+    olympic_data['matched_name'] = olympic_data['name'].apply(lambda x: process.extractOne(x, world_names)[0] if x else None)
 
-    except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
-        st.write("Please ensure the data files are properly uploaded and formatted.")
+    # Merge data
+    merged_data = olympic_data.merge(world_data, left_on='matched_name', right_on='name', how='left', suffixes=('_olympic', '_world'))
+
+    # Filter for athletes who won medals in both
+    matched_athletes = merged_data.dropna(subset=['name_world'])
+    matched_athletes['time_gap'] = matched_athletes['year_olympic'] - matched_athletes['year_world']
+
+    return olympic_data, world_data, matched_athletes
+
+# Load Data
+olympic_data, world_data, matched_athletes = load_data()
+
+# Sidebar Filters
+st.sidebar.header("🔍 Filter Data")
+year_filter = st.sidebar.multiselect("Select Year", sorted(olympic_data['year'].unique()), default=[])
+gender_filter = st.sidebar.multiselect("Select Gender", ['M', 'F'], default=[])
+medal_filter = st.sidebar.multiselect("Select Medal", ['Gold', 'Silver', 'Bronze'], default=[])
+
+# Apply Filters
+filtered_data = matched_athletes.copy()
+if year_filter:
+    filtered_data = filtered_data[filtered_data['year_olympic'].isin(year_filter)]
+if gender_filter:
+    filtered_data = filtered_data[filtered_data['sex'].isin(gender_filter)]
+if medal_filter:
+    filtered_data = filtered_data[filtered_data['medal_olympic'].isin(medal_filter)]
+
+# Metrics
+total_athletes = len(matched_athletes)
+unique_athletes = matched_athletes['name_olympic'].nunique()
+avg_time_gap = matched_athletes['time_gap'].mean()
+success_rate = (total_athletes / len(world_data)) * 100  # % of World medalists who won Olympic medals
+
+st.title("🏹 Olympic Archery Success Dashboard")
+
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("🏅 Matched Athletes", total_athletes)
+col2.metric("👤 Unique Athletes", unique_athletes)
+col3.metric("⏳ Avg Time Gap (Years)", round(avg_time_gap, 2))
+col4.metric("📈 Success Rate (%)", f"{success_rate:.2f}%")
+
+# Medal Transition Analysis
+st.subheader("🥇 Medal Transition Analysis")
+medal_counts = matched_athletes.groupby(['medal_olympic', 'medal_world']).size().unstack()
+
+fig, ax = plt.subplots(figsize=(8, 5))
+sns.heatmap(medal_counts, annot=True, cmap="coolwarm", fmt='d', ax=ax)
+st.pyplot(fig)
+
+# Age Distribution
+st.subheader("🎯 Age Distribution of Olympic Medalists")
+fig, ax = plt.subplots(figsize=(8, 5))
+sns.histplot(filtered_data, x='age_olympic', hue='medal_olympic', kde=True, bins=15, ax=ax)
+st.pyplot(fig)
+
+# Gender Distribution
+st.subheader("📊 Gender-Based Analysis")
+fig, ax = plt.subplots(figsize=(6, 4))
+sns.countplot(x='sex', hue='medal_olympic', data=filtered_data, palette="coolwarm", ax=ax)
+st.pyplot(fig)
+
+# Time Gap Distribution
+st.subheader("⏳ Time Gap Between World & Olympic Medals")
+fig, ax = plt.subplots(figsize=(8, 5))
+sns.histplot(filtered_data, x='time_gap', kde=True, bins=10, ax=ax)
+st.pyplot(fig)
+
+# Medal Type Transitions
+st.subheader("🔄 Medal Upgrade/Downgrade Analysis")
+upgrade_count = ((matched_athletes['medal_world'] == 'Bronze') & (matched_athletes['medal_olympic'] == 'Gold')).sum()
+downgrade_count = ((matched_athletes['medal_world'] == 'Gold') & (matched_athletes['medal_olympic'] == 'Bronze')).sum()
+same_medal = (matched_athletes['medal_olympic'] == matched_athletes['medal_world']).sum()
+
+col1, col2, col3 = st.columns(3)
+col1.metric("⬆️ Medal Upgrade", upgrade_count)
+col2.metric("⬇️ Medal Downgrade", downgrade_count)
+col3.metric("🔄 Same Medal", same_medal)
+
+# Country-Wise Performance
+st.subheader("🌍 Country-Wise Success in Olympic Transition")
+country_success = matched_athletes.groupby('country')['name_olympic'].nunique().sort_values(ascending=False)
+
+fig, ax = plt.subplots(figsize=(10, 5))
+sns.barplot(x=country_success.index[:10], y=country_success.values[:10], palette="viridis", ax=ax)
+ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+st.pyplot(fig)
+
+# Top Athletes Table
+st.subheader("🏆 Top Athletes Who Won Both World & Olympic Medals")
+top_athletes = matched_athletes[['name_olympic', 'country', 'medal_olympic', 'medal_world', 'time_gap']].sort_values(by='time_gap')
+st.dataframe(top_athletes.head(15))
+
+st.markdown("### 📌 Insights")
+st.write("""
+- **{}%** of World Championship medalists also won Olympic medals.
+- Some athletes **upgraded** from **Bronze to Gold**, while others downgraded.
+- The average time gap between a World Championship win and an Olympic medal is **{:.2f} years**.
+- **Top-performing countries** in Olympic transitions: {}.
+""".format(success_rate, avg_time_gap, ', '.join(country_success.index[:3])))
 
 # if __name__ == "__main__":
 #     main()

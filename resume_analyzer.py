@@ -7,8 +7,8 @@ from fuzzywuzzy import process
 # Load datasets
 @st.cache_data
 def load_data():
-    olympic_data = pd.read_csv("olympic_data.csv")  # Update with actual path
-    world_data = pd.read_csv("world_championship_data.csv")
+    olympic_data = pd.read_csv("individual_filtered_archery_data.csv")  # Update with actual path
+    world_data = pd.read_csv("archery_championships_cleaned.csv")
 
     # Standardize column names
     olympic_data.columns = olympic_data.columns.str.strip().str.lower().str.replace(' ', '_')

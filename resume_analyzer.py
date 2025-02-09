@@ -68,10 +68,24 @@ col3.metric("⏳ Avg Time Gap (Years)", round(avg_time_gap, 2))
 col4.metric("📈 Success Rate (%)", f"{success_rate:.2f}%")
 
 st.markdown("#### **📌 Interpretation**")
+# Filter only positive transition times
+valid_time_gaps = matched_athletes[matched_athletes['time_gap'] >= 0]['time_gap']
+
+# Calculate statistics
+transition_percentage = (len(matched_athletes) / len(world_data)) * 100  # % of World medalists who became Olympic medalists
+avg_transition_time = valid_time_gaps.mean()  # Average years to transition
+min_transition_time = valid_time_gaps.min()  # Minimum years to transition
+max_transition_time = valid_time_gaps.max()  # Maximum years to transition
+mode_transition_time = valid_time_gaps.mode().iloc[0] if not valid_time_gaps.mode().empty else "N/A"  # Most common transition time
+unique_athletes_count = matched_athletes['name_olympic'].nunique()  # Unique medalists
+
+# 📌 Interpretation Section
+st.markdown("#### **📌 Interpretation**")
 st.write(f"""
-- **{success_rate:.2f}%** of World Championship medalists later won Olympic medals, showing a strong correlation.
-- The **average transition time** from a World Champion to an Olympic medalist is **{round(avg_time_gap, 2)} years**.
-- Having **{unique_athletes} unique athletes** suggests that some archers won multiple medals over the years.
+- **{transition_percentage:.2f}%** of World Championship medalists later won Olympic medals, showing a strong correlation.
+- The **average transition time** from a World Champion to an Olympic medalist is **{avg_transition_time:.2f} years**.
+- The transition time varies from **{min_transition_time} to {max_transition_time} years**, with the most common transition period being **{mode_transition_time} years**.
+- Having **{unique_athletes_count} unique athletes** suggests that some archers won multiple medals over the years.
 """)
 
 # Medal Transition Analysis
@@ -79,23 +93,52 @@ st.write(f"""
 st.subheader("🥇 Medal Transition Analysis")
 medal_counts = matched_athletes.groupby(['medal_olympic', 'medal_world']).size().reset_index(name='count')
 
-# Calculate specific transitions
+# Calculate specific medal transitions
 bronze_to_gold = matched_athletes[(matched_athletes['medal_world'] == 'Bronze') & (matched_athletes['medal_olympic'] == 'Gold')]
+bronze_to_silver = matched_athletes[(matched_athletes['medal_world'] == 'Bronze') & (matched_athletes['medal_olympic'] == 'Silver')]
+silver_to_gold = matched_athletes[(matched_athletes['medal_world'] == 'Silver') & (matched_athletes['medal_olympic'] == 'Gold')]
+silver_to_bronze = matched_athletes[(matched_athletes['medal_world'] == 'Silver') & (matched_athletes['medal_olympic'] == 'Bronze')]
+gold_to_silver = matched_athletes[(matched_athletes['medal_world'] == 'Gold') & (matched_athletes['medal_olympic'] == 'Silver')]
 gold_to_bronze = matched_athletes[(matched_athletes['medal_world'] == 'Gold') & (matched_athletes['medal_olympic'] == 'Bronze')]
 
+# Count transitions
 bronze_to_gold_count = len(bronze_to_gold)
+bronze_to_silver_count = len(bronze_to_silver)
+silver_to_gold_count = len(silver_to_gold)
+silver_to_bronze_count = len(silver_to_bronze)
+gold_to_silver_count = len(gold_to_silver)
 gold_to_bronze_count = len(gold_to_bronze)
 
-fig = px.bar(medal_counts, x="medal_world", y="count", color="medal_olympic",
-             labels={"medal_world": "World Medal", "count": "Number of Athletes"},
-             title="Transition from World Championship to Olympic Medals")
+# Define custom colors for medals
+medal_colors = {
+    "Gold": "#FFD700",   # Gold color
+    "Silver": "#C0C0C0", # Silver color
+    "Bronze": "#CD7F32"  # Bronze color
+}
+
+# Create bar chart with updated colors
+fig = px.bar(
+    medal_counts, 
+    x="medal_world", 
+    y="count", 
+    color="medal_olympic",
+    color_discrete_map=medal_colors,  # Apply medal colors
+    labels={"medal_world": "World Medal", "count": "Number of Athletes"},
+    title="🏆 Transition from World Championship to Olympic Medals"
+)
+
+# Display the chart in Streamlit
 st.plotly_chart(fig)
 
+# 📌 Interpretation Section
 st.markdown("#### **📌 Interpretation**")
 st.write(f"""
-- **{bronze_to_gold_count} athletes** improved significantly, upgrading from **Bronze at the World Championships** to **Gold at the Olympics**.  
-- **{gold_to_bronze_count} athletes** downgraded from **Gold at Worlds to Bronze at the Olympics**, suggesting that Olympic competition is tougher.  
-- If **more athletes upgrade than downgrade**, it shows that many archers refine their skills between the two events.  
+- **{bronze_to_gold_count} athletes** improved from **Bronze at Worlds → Gold at Olympics**, showcasing major skill growth.
+- **{bronze_to_silver_count} athletes** advanced from **Bronze at Worlds → Silver at Olympics**, indicating steady improvement.
+- **{silver_to_gold_count} athletes** progressed from **Silver at Worlds → Gold at Olympics**, demonstrating peak performance.
+- **{silver_to_bronze_count} athletes** declined from **Silver at Worlds → Bronze at Olympics**, suggesting stronger Olympic competition.
+- **{gold_to_silver_count} athletes** dropped from **Gold at Worlds → Silver at Olympics**, showing a slight performance dip.
+- **{gold_to_bronze_count} athletes** fell from **Gold at Worlds → Bronze at Olympics**, highlighting the Olympic difficulty.
 """)
 
 # Dropdown to Show Upgraded and Downgraded Athletes
@@ -115,7 +158,6 @@ st.plotly_chart(fig)
 st.markdown("#### **📌 Interpretation**")
 st.write("""
 - The **peak performance age** for Olympic medalists is **25-30 years**.
-- Some archers succeed even in their **40s**, showing that experience matters.
 """)
 
 # Time Gap Distribution
@@ -160,7 +202,7 @@ st.write(f"""
 # Top Athletes Table
 # Top Athletes Table with Country Column from Olympic Data
 st.subheader("🏆 Top Athletes Who Won Both World & Olympic Medals")
-top_athletes = matched_athletes[['name_olympic', 'year_olympic', 'country_olympic', 'medal_olympic', 'medal_world', 'time_gap']]
+top_athletes = matched_athletes[['name_olympic', 'year_olympic','year_world','country_olympic', 'medal_olympic', 'medal_world', 'time_gap']]
 st.dataframe(top_athletes.sort_values(by='time_gap').head(15))
 
 st.markdown("#### **📌 Interpretation**")

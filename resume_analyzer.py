@@ -7,26 +7,30 @@ from fuzzywuzzy import process
 # Load datasets
 @st.cache_data
 def load_data():
-    olympic_data = pd.read_csv("individual_filtered_archery_data copy.csv")  # Update with actual path
-    world_data = pd.read_csv("archery_championships_cleaned.csv")
+    with st.spinner("🔄 Loading data... Please wait while we process the Olympic and World Championship records."):
 
-    # Standardize column names
-    olympic_data.columns = olympic_data.columns.str.strip().str.lower().str.replace(' ', '_')
-    world_data.columns = world_data.columns.str.strip().str.lower().str.replace(' ', '_')
+        olympic_data = pd.read_csv("individual_filtered_archery_data copy.csv")  # Update with actual path
+        world_data = pd.read_csv("archery_championships_cleaned.csv")
 
-    # Fuzzy match names
-    world_names = world_data['name'].dropna().unique()
-    olympic_data['matched_name'] = olympic_data['name'].apply(lambda x: process.extractOne(x, world_names)[0] if x else None)
+        # Standardize column names
+        olympic_data.columns = olympic_data.columns.str.strip().str.lower().str.replace(' ', '_')
+        world_data.columns = world_data.columns.str.strip().str.lower().str.replace(' ', '_')
 
-    # Merge data
-    merged_data = olympic_data.merge(world_data, left_on='matched_name', right_on='name', how='left', suffixes=('_olympic', '_world'))
+        # Fuzzy match names
+        world_names = world_data['name'].dropna().unique()
+        olympic_data['matched_name'] = olympic_data['name'].apply(lambda x: process.extractOne(x, world_names)[0] if x else None)
 
-    # Filter for athletes who won medals in both
-    matched_athletes = merged_data.dropna(subset=['name_world'])
-    matched_athletes['time_gap'] = matched_athletes['year_olympic'] - matched_athletes['year_world']
+        # Merge data
+        merged_data = olympic_data.merge(world_data, left_on='matched_name', right_on='name', how='left', suffixes=('_olympic', '_world'))
 
-    # Remove incorrect entries where time_gap is negative
-    matched_athletes = matched_athletes[matched_athletes['time_gap'] >= 0]
+        # Filter for athletes who won medals in both
+        matched_athletes = merged_data.dropna(subset=['name_world'])
+        matched_athletes['time_gap'] = matched_athletes['year_olympic'] - matched_athletes['year_world']
+
+        # Remove incorrect entries where time_gap is negative
+        matched_athletes = matched_athletes[matched_athletes['time_gap'] >= 0]
+
+        st.success("✅ Data successfully loaded! You can now explore the insights.")
 
 
     return olympic_data, world_data, matched_athletes

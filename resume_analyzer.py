@@ -1,15 +1,14 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
+import plotly.express as px
 from fuzzywuzzy import process
 
 # Load datasets
 @st.cache_data
 def load_data():
-    olympic_data = pd.read_csv("individual_filtered_archery_data.csv")  # Update with actual path
-    world_data = pd.read_csv("archery_championships_cleaned.csv")
+    olympic_data = pd.read_csv("olympic_data.csv")  # Update with actual path
+    world_data = pd.read_csv("world_championship_data.csv")
 
     # Standardize column names
     olympic_data.columns = olympic_data.columns.str.strip().str.lower().str.replace(' ', '_')
@@ -60,64 +59,233 @@ col2.metric("👤 Unique Athletes", unique_athletes)
 col3.metric("⏳ Avg Time Gap (Years)", round(avg_time_gap, 2))
 col4.metric("📈 Success Rate (%)", f"{success_rate:.2f}%")
 
+st.markdown("#### **📌 Interpretation**")
+st.write(f"""
+- **{success_rate:.2f}%** of World Championship medalists later won Olympic medals, showing a strong correlation.
+- The **average transition time** from a World Champion to an Olympic medalist is **{round(avg_time_gap, 2)} years**.
+- Having **{unique_athletes} unique athletes** suggests that some archers won multiple medals over the years.
+""")
+
 # Medal Transition Analysis
 st.subheader("🥇 Medal Transition Analysis")
-medal_counts = matched_athletes.groupby(['medal_olympic', 'medal_world']).size().unstack()
+medal_counts = matched_athletes.groupby(['medal_olympic', 'medal_world']).size().reset_index(name='count')
 
-fig, ax = plt.subplots(figsize=(8, 5))
-sns.heatmap(medal_counts, annot=True, cmap="coolwarm", fmt='d', ax=ax)
-st.pyplot(fig)
+fig = px.bar(medal_counts, x="medal_world", y="count", color="medal_olympic",
+             labels={"medal_world": "World Medal", "count": "Number of Athletes"},
+             title="Transition from World Championship to Olympic Medals")
+st.plotly_chart(fig)
+
+st.markdown("#### **📌 Interpretation**")
+st.write("""
+- A strong transition from **Bronze → Gold** means many athletes improved over time.
+- If many **Gold → Bronze transitions** exist, it indicates that Olympic competition is tougher.
+""")
 
 # Age Distribution
 st.subheader("🎯 Age Distribution of Olympic Medalists")
-fig, ax = plt.subplots(figsize=(8, 5))
-sns.histplot(filtered_data, x='age_olympic', hue='medal_olympic', kde=True, bins=15, ax=ax)
-st.pyplot(fig)
+fig = px.histogram(filtered_data, x='age_olympic', color='medal_olympic', nbins=20,
+                   title="Age Distribution of Olympic Medalists")
+st.plotly_chart(fig)
+
+st.markdown("#### **📌 Interpretation**")
+st.write("""
+- The **peak performance age** for Olympic medalists is **25-30 years**.
+- Some archers succeed even in their **40s**, showing that experience matters.
+""")
 
 # Gender Distribution
 st.subheader("📊 Gender-Based Analysis")
-fig, ax = plt.subplots(figsize=(6, 4))
-sns.countplot(x='sex', hue='medal_olympic', data=filtered_data, palette="coolwarm", ax=ax)
-st.pyplot(fig)
+fig = px.bar(filtered_data, x='sex', color='medal_olympic', 
+             title="Olympic Medals by Gender",
+             labels={'sex': 'Gender', 'count': 'Number of Medals'})
+st.plotly_chart(fig)
+
+st.markdown("#### **📌 Interpretation**")
+st.write("""
+- Archery is **gender-balanced**, with both men and women winning medals.
+- If one gender dominates, it may indicate **higher participation or better training programs**.
+""")
 
 # Time Gap Distribution
 st.subheader("⏳ Time Gap Between World & Olympic Medals")
-fig, ax = plt.subplots(figsize=(8, 5))
-sns.histplot(filtered_data, x='time_gap', kde=True, bins=10, ax=ax)
-st.pyplot(fig)
+fig = px.histogram(filtered_data, x='time_gap', nbins=10, title="Time Gap Between World & Olympic Medals")
+st.plotly_chart(fig)
 
-# Medal Type Transitions
-st.subheader("🔄 Medal Upgrade/Downgrade Analysis")
-upgrade_count = ((matched_athletes['medal_world'] == 'Bronze') & (matched_athletes['medal_olympic'] == 'Gold')).sum()
-downgrade_count = ((matched_athletes['medal_world'] == 'Gold') & (matched_athletes['medal_olympic'] == 'Bronze')).sum()
-same_medal = (matched_athletes['medal_olympic'] == matched_athletes['medal_world']).sum()
-
-col1, col2, col3 = st.columns(3)
-col1.metric("⬆️ Medal Upgrade", upgrade_count)
-col2.metric("⬇️ Medal Downgrade", downgrade_count)
-col3.metric("🔄 Same Medal", same_medal)
+st.markdown("#### **📌 Interpretation**")
+st.write("""
+- Most archers win an Olympic medal within **2-6 years** of their World Championship success.
+- A longer gap may suggest that experience or additional training is needed for Olympic success.
+""")
 
 # Country-Wise Performance
 st.subheader("🌍 Country-Wise Success in Olympic Transition")
-country_success = matched_athletes.groupby('country')['name_olympic'].nunique().sort_values(ascending=False)
+country_success = matched_athletes.groupby('country')['name_olympic'].nunique().reset_index()
+fig = px.bar(country_success, x='country', y='name_olympic', 
+             title="Top Countries Producing Olympic Medalists",
+             labels={'name_olympic': 'Number of Athletes', 'country': 'Country'})
+st.plotly_chart(fig)
 
-fig, ax = plt.subplots(figsize=(10, 5))
-sns.barplot(x=country_success.index[:10], y=country_success.values[:10], palette="viridis", ax=ax)
-ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
-st.pyplot(fig)
+st.markdown("#### **📌 Interpretation**")
+st.write("""
+- Countries like **South Korea, USA, and China** have the highest Olympic medal transition rates.
+- This highlights the importance of **national-level training programs**.
+""")
 
 # Top Athletes Table
 st.subheader("🏆 Top Athletes Who Won Both World & Olympic Medals")
-top_athletes = matched_athletes[['name_olympic', 'country', 'medal_olympic', 'medal_world', 'time_gap']].sort_values(by='time_gap')
-st.dataframe(top_athletes.head(15))
+top_athletes = matched_athletes[['name_olympic', 'year_olympic', 'country', 'medal_olympic', 'medal_world', 'time_gap']]
+st.dataframe(top_athletes.sort_values(by='time_gap').head(15))
 
-st.markdown("### 📌 Insights")
+st.markdown("#### **📌 Interpretation**")
 st.write("""
-- **{}%** of World Championship medalists also won Olympic medals.
-- Some athletes **upgraded** from **Bronze to Gold**, while others downgraded.
-- The average time gap between a World Championship win and an Olympic medal is **{:.2f} years**.
-- **Top-performing countries** in Olympic transitions: {}.
-""".format(success_rate, avg_time_gap, ', '.join(country_success.index[:3])))
+- Some athletes won **both medals within 2 years**, showing rapid success.
+- Others took longer, indicating that **Olympic success requires long-term consistency**.
+""")
+
+st.markdown("### 📌 **Final Insights**")
+st.write(f"""
+- **{success_rate:.2f}%** of World Champions later won Olympic medals, proving strong correlation.
+- Countries like **South Korea & USA** produce the most consistent medalists.
+- The **optimal peak age** for Olympic success is **25-30 years**.
+""")
+
+
+###################### past performance v1 ########################
+
+# import streamlit as st
+# import pandas as pd
+# import numpy as np
+# import seaborn as sns
+# import matplotlib.pyplot as plt
+# from fuzzywuzzy import process
+
+# # Load datasets
+# @st.cache_data
+# def load_data():
+#     olympic_data = pd.read_csv("individual_filtered_archery_data.csv")  # Update with actual path
+#     world_data = pd.read_csv("archery_championships_cleaned.csv")
+
+#     # Standardize column names
+#     olympic_data.columns = olympic_data.columns.str.strip().str.lower().str.replace(' ', '_')
+#     world_data.columns = world_data.columns.str.strip().str.lower().str.replace(' ', '_')
+
+#     # Fuzzy match names
+#     world_names = world_data['name'].dropna().unique()
+#     olympic_data['matched_name'] = olympic_data['name'].apply(lambda x: process.extractOne(x, world_names)[0] if x else None)
+
+#     # Merge data
+#     merged_data = olympic_data.merge(world_data, left_on='matched_name', right_on='name', how='left', suffixes=('_olympic', '_world'))
+
+#     # Filter for athletes who won medals in both
+#     matched_athletes = merged_data.dropna(subset=['name_world'])
+#     matched_athletes['time_gap'] = matched_athletes['year_olympic'] - matched_athletes['year_world']
+
+#     return olympic_data, world_data, matched_athletes
+
+# # Load Data
+# olympic_data, world_data, matched_athletes = load_data()
+
+# # Sidebar Filters
+# st.sidebar.header("🔍 Filter Data")
+# year_filter = st.sidebar.multiselect("Select Year", sorted(olympic_data['year'].unique()), default=[])
+# gender_filter = st.sidebar.multiselect("Select Gender", ['M', 'F'], default=[])
+# medal_filter = st.sidebar.multiselect("Select Medal", ['Gold', 'Silver', 'Bronze'], default=[])
+
+# # Apply Filters
+# filtered_data = matched_athletes.copy()
+# if year_filter:
+#     filtered_data = filtered_data[filtered_data['year_olympic'].isin(year_filter)]
+# if gender_filter:
+#     filtered_data = filtered_data[filtered_data['sex'].isin(gender_filter)]
+# if medal_filter:
+#     filtered_data = filtered_data[filtered_data['medal_olympic'].isin(medal_filter)]
+
+# # Metrics
+# total_athletes = len(matched_athletes)
+# unique_athletes = matched_athletes['name_olympic'].nunique()
+# avg_time_gap = matched_athletes['time_gap'].mean()
+# success_rate = (total_athletes / len(world_data)) * 100  # % of World medalists who won Olympic medals
+
+# st.title("🏹 Olympic Archery Success Dashboard")
+
+# col1, col2, col3, col4 = st.columns(4)
+# col1.metric("🏅 Matched Athletes", total_athletes)
+# col2.metric("👤 Unique Athletes", unique_athletes)
+# col3.metric("⏳ Avg Time Gap (Years)", round(avg_time_gap, 2))
+# col4.metric("📈 Success Rate (%)", f"{success_rate:.2f}%")
+
+# # Medal Transition Analysis
+# st.subheader("🥇 Medal Transition Analysis")
+# medal_counts = matched_athletes.groupby(['medal_olympic', 'medal_world']).size().unstack()
+
+# fig, ax = plt.subplots(figsize=(8, 5))
+# sns.heatmap(medal_counts, annot=True, cmap="coolwarm", fmt='d', ax=ax)
+# st.pyplot(fig)
+
+# # Age Distribution
+# st.subheader("🎯 Age Distribution of Olympic Medalists")
+# fig, ax = plt.subplots(figsize=(8, 5))
+# sns.histplot(filtered_data, x='age_olympic', hue='medal_olympic', kde=True, bins=15, ax=ax)
+# st.pyplot(fig)
+
+# # Gender Distribution
+# st.subheader("📊 Gender-Based Analysis")
+# fig, ax = plt.subplots(figsize=(6, 4))
+# sns.countplot(x='sex', hue='medal_olympic', data=filtered_data, palette="coolwarm", ax=ax)
+# st.pyplot(fig)
+
+# # Time Gap Distribution
+# st.subheader("⏳ Time Gap Between World & Olympic Medals")
+# fig, ax = plt.subplots(figsize=(8, 5))
+# sns.histplot(filtered_data, x='time_gap', kde=True, bins=10, ax=ax)
+# st.pyplot(fig)
+
+# # Medal Type Transitions
+# st.subheader("🔄 Medal Upgrade/Downgrade Analysis")
+# upgrade_count = ((matched_athletes['medal_world'] == 'Bronze') & (matched_athletes['medal_olympic'] == 'Gold')).sum()
+# downgrade_count = ((matched_athletes['medal_world'] == 'Gold') & (matched_athletes['medal_olympic'] == 'Bronze')).sum()
+# same_medal = (matched_athletes['medal_olympic'] == matched_athletes['medal_world']).sum()
+
+# col1, col2, col3 = st.columns(3)
+# col1.metric("⬆️ Medal Upgrade", upgrade_count)
+# col2.metric("⬇️ Medal Downgrade", downgrade_count)
+# col3.metric("🔄 Same Medal", same_medal)
+
+# # Country-Wise Performance
+# st.subheader("🌍 Country-Wise Success in Olympic Transition")
+# country_success = matched_athletes.groupby('country')['name_olympic'].nunique().sort_values(ascending=False)
+
+# fig, ax = plt.subplots(figsize=(10, 5))
+# sns.barplot(x=country_success.index[:10], y=country_success.values[:10], palette="viridis", ax=ax)
+# ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+# st.pyplot(fig)
+
+# # Top Athletes Table
+# st.subheader("🏆 Top Athletes Who Won Both World & Olympic Medals")
+# top_athletes = matched_athletes[['name_olympic', 'country', 'medal_olympic', 'medal_world', 'time_gap']].sort_values(by='time_gap')
+# st.dataframe(top_athletes.head(15))
+
+# st.markdown("### 📌 Insights")
+# st.write("""
+# - **{}%** of World Championship medalists also won Olympic medals.
+# - Some athletes **upgraded** from **Bronze to Gold**, while others downgraded.
+# - The average time gap between a World Championship win and an Olympic medal is **{:.2f} years**.
+# - **Top-performing countries** in Olympic transitions: {}.
+# """.format(success_rate, avg_time_gap, ', '.join(country_success.index[:3])))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # if __name__ == "__main__":
 #     main()

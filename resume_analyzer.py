@@ -280,7 +280,7 @@ with col2:
 
 # Display filtered data
 st.markdown("### 📋 Detailed Data View")
-st.dataframe(filtered_df[["Name", "Sex", "Age", "Year", "Event", "Medal", "Event_Type", "Season"]])
+st.dataframe(filtered_df[["Name", "Sex", "Age", "Year", "NOC","Event", "Medal", "Event_Type", "Season"]])
 
 
 # Key improvements made in this updated version:

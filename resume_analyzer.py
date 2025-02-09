@@ -7,7 +7,7 @@ from fuzzywuzzy import process
 # Load datasets
 @st.cache_data
 def load_data():
-    olympic_data = pd.read_csv("individual_filtered_archery_data.csv")  # Update with actual path
+    olympic_data = pd.read_csv("individual_filtered_archery_data copy.csv")  # Update with actual path
     world_data = pd.read_csv("archery_championships_cleaned.csv")
 
     # Standardize column names
@@ -72,8 +72,11 @@ st.subheader("🥇 Medal Transition Analysis")
 medal_counts = matched_athletes.groupby(['medal_olympic', 'medal_world']).size().reset_index(name='count')
 
 # Calculate specific transitions
-bronze_to_gold = medal_counts[(medal_counts['medal_world'] == 'Bronze') & (medal_counts['medal_olympic'] == 'Gold')]['count'].sum()
-gold_to_bronze = medal_counts[(medal_counts['medal_world'] == 'Gold') & (medal_counts['medal_olympic'] == 'Bronze')]['count'].sum()
+bronze_to_gold = matched_athletes[(matched_athletes['medal_world'] == 'Bronze') & (matched_athletes['medal_olympic'] == 'Gold')]
+gold_to_bronze = matched_athletes[(matched_athletes['medal_world'] == 'Gold') & (matched_athletes['medal_olympic'] == 'Bronze')]
+
+bronze_to_gold_count = len(bronze_to_gold)
+gold_to_bronze_count = len(gold_to_bronze)
 
 fig = px.bar(medal_counts, x="medal_world", y="count", color="medal_olympic",
              labels={"medal_world": "World Medal", "count": "Number of Athletes"},
@@ -82,10 +85,18 @@ st.plotly_chart(fig)
 
 st.markdown("#### **📌 Interpretation**")
 st.write(f"""
-- **{bronze_to_gold} athletes** improved significantly, upgrading from **Bronze at the World Championships** to **Gold at the Olympics**.  
-- **{gold_to_bronze} athletes** downgraded from **Gold at Worlds to Bronze at the Olympics**, suggesting that Olympic competition is tougher.  
+- **{bronze_to_gold_count} athletes** improved significantly, upgrading from **Bronze at the World Championships** to **Gold at the Olympics**.  
+- **{gold_to_bronze_count} athletes** downgraded from **Gold at Worlds to Bronze at the Olympics**, suggesting that Olympic competition is tougher.  
 - If **more athletes upgrade than downgrade**, it shows that many archers refine their skills between the two events.  
 """)
+
+# Dropdown to Show Upgraded and Downgraded Athletes
+with st.expander("🔼 View Upgraded Athletes (Bronze → Gold)"):
+    st.dataframe(bronze_to_gold[['name_olympic', 'year_olympic', 'country_olympic', 'medal_world', 'medal_olympic', 'time_gap']])
+
+with st.expander("🔽 View Downgraded Athletes (Gold → Bronze)"):
+    st.dataframe(gold_to_bronze[['name_olympic', 'year_olympic', 'country_olympic', 'medal_world', 'medal_olympic', 'time_gap']])
+
 
 # Age Distribution
 st.subheader("🎯 Age Distribution of Olympic Medalists")
@@ -124,22 +135,37 @@ st.write("""
 """)
 
 # Country-Wise Performance
+# Country-Wise Success in Olympic Transition
 st.subheader("🌍 Country-Wise Success in Olympic Transition")
-country_success = matched_athletes.groupby('country')['name_olympic'].nunique().reset_index()
-fig = px.bar(country_success, x='country', y='name_olympic', 
-             title="Top Countries Producing Olympic Medalists",
-             labels={'name_olympic': 'Number of Athletes', 'country': 'Country'})
+
+# Group by Olympic country and count unique athletes
+country_success = matched_athletes.groupby('country_olympic')['name_olympic'].nunique().reset_index()
+country_success = country_success.rename(columns={'name_olympic': 'athlete_count'})
+top_countries = country_success.sort_values(by='athlete_count', ascending=False).head(7)
+
+# Get the top country and their success count
+top_country = top_countries.iloc[0]['country_olympic']
+top_country_count = top_countries.iloc[0]['athlete_count']
+
+fig = px.bar(top_countries, x='country_olympic', y='athlete_count', 
+             title="Top 7 Countries Producing Olympic Medalists",
+             labels={'athlete_count': 'Number of Athletes', 'country_olympic': 'Country'},
+             color='athlete_count',
+             color_continuous_scale='Blues')
+
 st.plotly_chart(fig)
 
 st.markdown("#### **📌 Interpretation**")
-st.write("""
-- Countries like **South Korea, USA, and China** have the highest Olympic medal transition rates.
-- This highlights the importance of **national-level training programs**.
+st.write(f"""
+- The **top-performing country** in Olympic transitions is **{top_country}**, with **{top_country_count} athletes** successfully winning Olympic medals after medaling at the World Championships.  
+- The **top 7 countries** shown above dominate in transitioning world-class archers to Olympic medalists.  
+- Countries with strong archery programs consistently produce successful Olympians, reinforcing the importance of structured training.  
 """)
 
 # Top Athletes Table
+# Top Athletes Table with Country Column from Olympic Data
 st.subheader("🏆 Top Athletes Who Won Both World & Olympic Medals")
-top_athletes = matched_athletes[['name_olympic', 'year_olympic', 'country', 'medal_olympic', 'medal_world', 'time_gap']]
+top_athletes = matched_athletes[['name_olympic', 'year_olympic', 'country_olympic', 'medal_olympic', 'medal_world', 'time_gap']]
 st.dataframe(top_athletes.sort_values(by='time_gap').head(15))
 
 st.markdown("#### **📌 Interpretation**")
@@ -147,6 +173,15 @@ st.write("""
 - Some athletes won **both medals within 2 years**, showing rapid success.
 - Others took longer, indicating that **Olympic success requires long-term consistency**.
 """)
+# st.subheader("🏆 Top Athletes Who Won Both World & Olympic Medals")
+# top_athletes = matched_athletes[['name_olympic', 'year_olympic', 'country', 'medal_olympic', 'medal_world', 'time_gap']]
+# st.dataframe(top_athletes.sort_values(by='time_gap').head(15))
+
+# st.markdown("#### **📌 Interpretation**")
+# st.write("""
+# - Some athletes won **both medals within 2 years**, showing rapid success.
+# - Others took longer, indicating that **Olympic success requires long-term consistency**.
+# """)
 
 st.markdown("### 📌 **Final Insights**")
 st.write(f"""

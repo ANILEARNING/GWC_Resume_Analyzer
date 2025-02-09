@@ -1,286 +1,467 @@
-import pandas as pd
-import wikipediaapi
-from datetime import datetime
-import re
 import streamlit as st
+import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+from scipy import stats
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 # Set page configuration
-st.set_page_config(layout="wide", page_title="Olympic Archery Analytics")
+st.set_page_config(
+    page_title="Archery Performance Correlation Analysis",
+    page_icon="🎯",
+    layout="wide"
+)
 
-# Custom CSS
-st.markdown("""
-    <style>
-    .main {
-        padding: 2rem;
-    }
-    .stSelectbox, .stRadio {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-    }
-    h1 {
-        color: #1f77b4;
-    }
-    .metric-card {
-        background-color: #ffffff;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# Functions remain the same as in your original code
-def get_dob_from_wikipedia(athlete_name):
-    """Fetch the athlete's Date of Birth (DOB) from Wikipedia."""
-    user_agent = "OlympicDataFetcher/1.0 (your-email@example.com)"
-    wiki_wiki = wikipediaapi.Wikipedia(user_agent, "en")
-    page = wiki_wiki.page(athlete_name)
-    
-    if not page.exists():
-        return None
-    
-    dob_match = re.search(r'Born.*?(\d{1,2} \w+ \d{4})', page.text)
-    if dob_match:
-        dob_str = dob_match.group(1)
-        try:
-            dob_date = datetime.strptime(dob_str, "%d %B %Y")
-            return dob_date.strftime("%Y-%m-%d")
-        except ValueError:
-            return None
-    return None
-
-def calculate_age(dob, olympic_year):
-    """Calculate age from DOB and Olympic year."""
-    dob_date = datetime.strptime(dob, "%Y-%m-%d")
-    return olympic_year - dob_date.year
-
-# Load and prepare data
-@st.cache_data
+# Function to load and process data
 def load_data():
-    df = pd.read_csv("athlete_events.csv")
-    df = df[(df["Sport"] == "Archery") & (df["Medal"].notna())]
+    # Load your datasets
+    concat_df = pd.read_csv("archery_championships_cleaned.csv")
+    olympic_df = pd.read_csv("individual_filtered_archery_data.csv")
     
-    # Create Team/Individual column
-    df['Event_Type'] = df['Event'].apply(
-        lambda x: 'Team' if any(word in x.lower() for word in ['team', 'double']) else 'Individual'
-    )
+    # Convert medals to numeric values for correlation analysis
+    medal_values = {'Gold': 3, 'Silver': 2, 'Bronze': 1}
+    concat_df['Medal_Value'] = concat_df['Medal'].map(medal_values)
+    olympic_df['Medal_Value'] = olympic_df['Medal'].map(medal_values)
     
-    # Handle missing ages (your existing code for age imputation)
-    df_missing_age = df[df["Age"].isna()]
-    for index, row in df_missing_age.iterrows():
-        dob = get_dob_from_wikipedia(row["Name"])
-        if dob:
-            age = calculate_age(dob, row["Year"])
-            df.at[index, "Age"] = age
+    return concat_df, olympic_df
+
+def calculate_performance_metrics(athlete_data):
+    """Calculate performance metrics for each athlete"""
+    metrics = {
+        'total_medals': len(athlete_data),
+        'gold_medals': len(athlete_data[athlete_data['Medal'] == 'Gold']),
+        'avg_performance': athlete_data['Medal_Value'].mean(),
+        'performance_trend': stats.linregress(range(len(athlete_data)), athlete_data['Medal_Value']).slope
+    }
+    return pd.Series(metrics)
+
+def main():
+    st.title("🎯 Archery Performance Correlation Analysis")
+    st.write("Analyzing correlation between Olympic medals and past championship performances")
     
-    # df["Age"].fillna(df["Age"].mean(), inplace=True)
-    df.loc[df["Age"].isna() & (df["Sex"] == "M"), "Age"] = round(df[df["Sex"] == "M"]["Age"].mean())
-    df.loc[df["Age"].isna() & (df["Sex"] == "F"), "Age"] = round(df[df["Sex"] == "F"]["Age"].mean())
+    try:
+        # Load data
+        concat_df, olympic_df = load_data()
+        
+        # Sidebar filters
+        st.sidebar.header("Filters")
+        year_range = st.sidebar.slider(
+            "Select Year Range",
+            min_value=min(concat_df['Year'].min(), olympic_df['Year'].min()),
+            max_value=max(concat_df['Year'].max(), olympic_df['Year'].max()),
+            value=(1920, 2020)
+        )
+        
+        # Filter data based on year range
+        concat_filtered = concat_df[(concat_df['Year'] >= year_range[0]) & (concat_df['Year'] <= year_range[1])]
+        olympic_filtered = olympic_df[(olympic_df['Year'] >= year_range[0]) & (olympic_df['Year'] <= year_range[1])]
+        
+        # Create tabs for different analyses
+        tab1, tab2, tab3 = st.tabs(["Performance Overview", "Correlation Analysis", "Athlete Profiles"])
+        
+        # Tab 1: Performance Overview
+        with tab1:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("Medal Distribution Over Time")
+                fig_timeline = px.scatter(
+                    pd.concat([concat_filtered, olympic_filtered]),
+                    x='Year',
+                    y='Medal',
+                    color='Medal',
+                    size='Medal_Value',
+                    hover_data=['Name'],
+                    title='Medal Distribution Timeline'
+                )
+                st.plotly_chart(fig_timeline, use_container_width=True)
+            
+            with col2:
+                st.subheader("Performance Progression")
+                athlete_perf = pd.concat([
+                    concat_filtered.groupby('Name')['Medal_Value'].mean(),
+                    olympic_filtered.groupby('Name')['Medal_Value'].mean()
+                ]).reset_index()
+                
+                fig_progression = px.box(
+                    athlete_perf,
+                    y='Medal_Value',
+                    title='Performance Distribution'
+                )
+                st.plotly_chart(fig_progression, use_container_width=True)
+        
+        # Tab 2: Correlation Analysis
+        with tab2:
+            st.subheader("Performance Correlation Analysis")
+            
+            # Calculate pre-Olympic performance metrics
+            pre_olympic_metrics = concat_filtered.groupby('Name').apply(calculate_performance_metrics)
+            
+            # Calculate Olympic performance
+            olympic_performance = olympic_filtered.groupby('Name')['Medal_Value'].mean()
+            
+            # Merge metrics
+            correlation_data = pd.merge(
+                pre_olympic_metrics,
+                olympic_performance,
+                left_index=True,
+                right_index=True,
+                how='inner',
+                suffixes=('_pre', '_olympic')
+            )
+            
+            # Calculate correlations
+            correlation_matrix = correlation_data.corr()
+            
+            # Plot correlation heatmap
+            fig_corr = px.imshow(
+                correlation_matrix,
+                title='Performance Correlation Heatmap',
+                color_continuous_scale='RdBu'
+            )
+            st.plotly_chart(fig_corr, use_container_width=True)
+            
+            # Scatter plot of pre-Olympic vs Olympic performance
+            fig_scatter = px.scatter(
+                correlation_data,
+                x='avg_performance',
+                y='Medal_Value_olympic',
+                title='Pre-Olympic vs Olympic Performance',
+                trendline="ols",
+                labels={
+                    'avg_performance': 'Average Pre-Olympic Performance',
+                    'Medal_Value_olympic': 'Olympic Performance'
+                }
+            )
+            st.plotly_chart(fig_scatter, use_container_width=True)
+        
+        # Tab 3: Athlete Profiles
+        with tab3:
+            st.subheader("Individual Athlete Analysis")
+            
+            # Athlete selector
+            selected_athlete = st.selectbox(
+                "Select Athlete",
+                pd.concat([concat_filtered['Name'], olympic_filtered['Name']]).unique()
+            )
+            
+            # Get athlete's performance history
+            athlete_history = pd.concat([
+                concat_filtered[concat_filtered['Name'] == selected_athlete],
+                olympic_filtered[olympic_filtered['Name'] == selected_athlete]
+            ]).sort_values('Year')
+            
+            # Performance timeline
+            fig_athlete = px.line(
+                athlete_history,
+                x='Year',
+                y='Medal_Value',
+                title=f'Performance Timeline for {selected_athlete}',
+                markers=True
+            )
+            st.plotly_chart(fig_athlete, use_container_width=True)
+            
+            # Performance statistics
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Medals", len(athlete_history))
+            with col2:
+                st.metric("Average Performance", round(athlete_history['Medal_Value'].mean(), 2))
+            with col3:
+                st.metric("Peak Performance Year", athlete_history.loc[athlete_history['Medal_Value'].idxmax(), 'Year'])
 
-    return df
+    except Exception as e:
+        st.error(f"Error loading data: {str(e)}")
+        st.write("Please ensure the data files are properly uploaded and formatted.")
 
-# Load data
-df = load_data()
+# if __name__ == "__main__":
+#     main()
 
-# Main title
-st.title("🏹 Olympic Archery Analytics Dashboard")
-st.markdown("---")
+# import pandas as pd
+# import wikipediaapi
+# from datetime import datetime
+# import re
+# import streamlit as st
+# import plotly.express as px
+# import plotly.graph_objects as go
+# from plotly.subplots import make_subplots
 
-# Filters in main content area
-col1, col2, col3, col4 = st.columns(4)
+# # Set page configuration
+# st.set_page_config(layout="wide", page_title="Olympic Archery Analytics")
 
-with col1:
-    years = sorted(df["Year"].unique())
-    selected_year = st.selectbox(
-        "Select Olympic Year",
-        ["All"] + list(years),
-        index=0
-    )
+# # Custom CSS
+# st.markdown("""
+#     <style>
+#     .main {
+#         padding: 2rem;
+#     }
+#     .stSelectbox, .stRadio {
+#         background-color: #f0f2f6;
+#         padding: 1rem;
+#         border-radius: 0.5rem;
+#     }
+#     h1 {
+#         color: #1f77b4;
+#     }
+#     .metric-card {
+#         background-color: #ffffff;
+#         padding: 1rem;
+#         border-radius: 0.5rem;
+#         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+#     }
+#     </style>
+# """, unsafe_allow_html=True)
 
-with col2:
-    selected_gender = st.radio(
-        "Select Gender",
-        ["Both", "M", "F"],
-        horizontal=True
-    )
+# # Functions remain the same as in your original code
+# def get_dob_from_wikipedia(athlete_name):
+#     """Fetch the athlete's Date of Birth (DOB) from Wikipedia."""
+#     user_agent = "OlympicDataFetcher/1.0 (your-email@example.com)"
+#     wiki_wiki = wikipediaapi.Wikipedia(user_agent, "en")
+#     page = wiki_wiki.page(athlete_name)
+    
+#     if not page.exists():
+#         return None
+    
+#     dob_match = re.search(r'Born.*?(\d{1,2} \w+ \d{4})', page.text)
+#     if dob_match:
+#         dob_str = dob_match.group(1)
+#         try:
+#             dob_date = datetime.strptime(dob_str, "%d %B %Y")
+#             return dob_date.strftime("%Y-%m-%d")
+#         except ValueError:
+#             return None
+#     return None
 
-with col3:
-    event_types = df["Event_Type"].unique()
-    selected_event = st.selectbox(
-        "Select Event Type",
-        ["All"] + list(event_types)
-    )
+# def calculate_age(dob, olympic_year):
+#     """Calculate age from DOB and Olympic year."""
+#     dob_date = datetime.strptime(dob, "%Y-%m-%d")
+#     return olympic_year - dob_date.year
 
-with col4:
-    seasons = df["Season"].unique()
-    selected_season = st.selectbox(
-        "Select Season",
-        ["All"] + list(seasons)
-    )
+# # Load and prepare data
+# @st.cache_data
+# def load_data():
+#     df = pd.read_csv("athlete_events.csv")
+#     df = df[(df["Sport"] == "Archery") & (df["Medal"].notna())]
+    
+#     # Create Team/Individual column
+#     df['Event_Type'] = df['Event'].apply(
+#         lambda x: 'Team' if any(word in x.lower() for word in ['team', 'double']) else 'Individual'
+#     )
+    
+#     # Handle missing ages (your existing code for age imputation)
+#     df_missing_age = df[df["Age"].isna()]
+#     for index, row in df_missing_age.iterrows():
+#         dob = get_dob_from_wikipedia(row["Name"])
+#         if dob:
+#             age = calculate_age(dob, row["Year"])
+#             df.at[index, "Age"] = age
+    
+#     # df["Age"].fillna(df["Age"].mean(), inplace=True)
+#     df.loc[df["Age"].isna() & (df["Sex"] == "M"), "Age"] = round(df[df["Sex"] == "M"]["Age"].mean())
+#     df.loc[df["Age"].isna() & (df["Sex"] == "F"), "Age"] = round(df[df["Sex"] == "F"]["Age"].mean())
 
-# Filter data based on selections
-filtered_df = df.copy()
-if selected_year != "All":
-    filtered_df = filtered_df[filtered_df["Year"] == selected_year]
-if selected_gender != "Both":
-    filtered_df = filtered_df[filtered_df["Sex"] == selected_gender]
-if selected_event != "All":
-    filtered_df = filtered_df[filtered_df["Event_Type"] == selected_event]
-if selected_season != "All":
-    filtered_df = filtered_df[filtered_df["Season"] == selected_season]
+#     return df
 
-# Key Metrics
-st.markdown("### 📊 Key Metrics")
-metric_col1, metric_col2, metric_col3, metric_col4, metric_col5 = st.columns(5)
+# # Load data
+# df = load_data()
 
-with metric_col1:
-    st.metric("Unique Athletes", len(filtered_df["Name"].unique()))
-with metric_col2:
-    st.metric("Medalist Count", len(filtered_df["Name"]))
-with metric_col3:
-    gender_ratio = filtered_df["Sex"].value_counts(normalize=True)
-    female_pct = gender_ratio.get("F", 0) * 100
-    st.metric("Female Athletes", f"{female_pct:.1f}%")
-with metric_col4:
-    st.metric("Average Age", f"{filtered_df['Age'].mean():.1f}")
-with metric_col5:
-    st.metric("Age Range", f"{filtered_df['Age'].min():.0f} - {filtered_df['Age'].max():.0f}")
+# # Main title
+# st.title("🏹 Olympic Archery Analytics Dashboard")
+# st.markdown("---")
 
-# Age Distribution Chart (similar to the image)
-st.markdown("### 🎯 Age Distribution by Gender")
+# # Filters in main content area
+# col1, col2, col3, col4 = st.columns(4)
 
-# Create mirrored histogram
-fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.02, 
-                    row_heights=[0.5, 0.5])
+# with col1:
+#     years = sorted(df["Year"].unique())
+#     selected_year = st.selectbox(
+#         "Select Olympic Year",
+#         ["All"] + list(years),
+#         index=0
+#     )
 
-# Female distribution (top)
-female_df = filtered_df[filtered_df["Sex"] == "F"]
-fig.add_trace(
-    go.Bar(x=female_df["Age"].value_counts().sort_index().index,
-           y=female_df["Age"].value_counts().sort_index().values,
-           name="Female",
-           marker_color="#FF69B4"),
-    row=1, col=1
-)
+# with col2:
+#     selected_gender = st.radio(
+#         "Select Gender",
+#         ["Both", "M", "F"],
+#         horizontal=True
+#     )
 
-# Male distribution (bottom, negative values)
-male_df = filtered_df[filtered_df["Sex"] == "M"]
-fig.add_trace(
-    go.Bar(x=male_df["Age"].value_counts().sort_index().index,
-           y=-male_df["Age"].value_counts().sort_index().values,
-           name="Male",
-           marker_color="#4169E1"),
-    row=2, col=1
-)
+# with col3:
+#     event_types = df["Event_Type"].unique()
+#     selected_event = st.selectbox(
+#         "Select Event Type",
+#         ["All"] + list(event_types)
+#     )
 
-fig.update_layout(
-    height=600,
-    showlegend=True,
-    title_text="Age Distribution by Gender",
-    xaxis2_title="Age",
-    yaxis_title="Female Count",
-    yaxis2_title="Male Count"
-)
+# with col4:
+#     seasons = df["Season"].unique()
+#     selected_season = st.selectbox(
+#         "Select Season",
+#         ["All"] + list(seasons)
+#     )
 
-st.plotly_chart(fig, use_container_width=True)
+# # Filter data based on selections
+# filtered_df = df.copy()
+# if selected_year != "All":
+#     filtered_df = filtered_df[filtered_df["Year"] == selected_year]
+# if selected_gender != "Both":
+#     filtered_df = filtered_df[filtered_df["Sex"] == selected_gender]
+# if selected_event != "All":
+#     filtered_df = filtered_df[filtered_df["Event_Type"] == selected_event]
+# if selected_season != "All":
+#     filtered_df = filtered_df[filtered_df["Season"] == selected_season]
 
-# Additional visualizations
+# # Key Metrics
+# st.markdown("### 📊 Key Metrics")
+# metric_col1, metric_col2, metric_col3, metric_col4, metric_col5 = st.columns(5)
+
+# with metric_col1:
+#     st.metric("Unique Athletes", len(filtered_df["Name"].unique()))
+# with metric_col2:
+#     st.metric("Medalist Count", len(filtered_df["Name"]))
+# with metric_col3:
+#     gender_ratio = filtered_df["Sex"].value_counts(normalize=True)
+#     female_pct = gender_ratio.get("F", 0) * 100
+#     st.metric("Female Athletes", f"{female_pct:.1f}%")
+# with metric_col4:
+#     st.metric("Average Age", f"{filtered_df['Age'].mean():.1f}")
+# with metric_col5:
+#     st.metric("Age Range", f"{filtered_df['Age'].min():.0f} - {filtered_df['Age'].max():.0f}")
+
+# # Age Distribution Chart (similar to the image)
+# st.markdown("### 🎯 Age Distribution by Gender")
+
+# # Create mirrored histogram
+# fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.02, 
+#                     row_heights=[0.5, 0.5])
+
+# # Female distribution (top)
+# female_df = filtered_df[filtered_df["Sex"] == "F"]
+# fig.add_trace(
+#     go.Bar(x=female_df["Age"].value_counts().sort_index().index,
+#            y=female_df["Age"].value_counts().sort_index().values,
+#            name="Female",
+#            marker_color="#FF69B4"),
+#     row=1, col=1
+# )
+
+# # Male distribution (bottom, negative values)
+# male_df = filtered_df[filtered_df["Sex"] == "M"]
+# fig.add_trace(
+#     go.Bar(x=male_df["Age"].value_counts().sort_index().index,
+#            y=-male_df["Age"].value_counts().sort_index().values,
+#            name="Male",
+#            marker_color="#4169E1"),
+#     row=2, col=1
+# )
+
+# fig.update_layout(
+#     height=600,
+#     showlegend=True,
+#     title_text="Age Distribution by Gender",
+#     xaxis2_title="Age",
+#     yaxis_title="Female Count",
+#     yaxis2_title="Male Count"
+# )
+
+# st.plotly_chart(fig, use_container_width=True)
+
+# # Additional visualizations
+# # col1, col2 = st.columns(2)
+
+# # with col1:
+# st.markdown("### 📈 Age Trends Over Time")
+# age_trends = px.box(filtered_df, x="Year", y="Age", color="Sex",
+#                     title="Age Distribution Across Olympics")
+# st.plotly_chart(age_trends, use_container_width=True)
+
+# # with col2:
+#     # st.markdown("### 🏅 Medal Distribution by Age Group")
+#     # filtered_df["Age_Group"] = pd.cut(filtered_df["Age"], 
+#     #                                 bins=[0, 20, 25, 30, 35, 100],
+#     #                                 labels=["Under 20", "20-25", "26-30", "31-35", "Over 35"])
+    
+#     # medal_dist = px.bar(filtered_df, x="Age_Group", color="Medal",
+#     #                    title="Medals by Age Group",
+#     #                    category_orders={"Medal": ["Gold", "Silver", "Bronze"]})
+#     # st.plotly_chart(medal_dist, use_container_width=True)
+# st.markdown("### 🏅 Medal Distribution by Age Group")
+    
+# filtered_df["Age_Group"] = pd.cut(filtered_df["Age"], 
+#                                     bins=[0, 20, 25, 30, 35, 100],
+#                                     labels=["Under 20", "20-25", "26-30", "31-35", "Over 35"])
+
+# # Group by Age_Group and Medal, then count medals
+# medal_counts = filtered_df.groupby(["Age_Group", "Medal"]).size().reset_index(name="count")
+
+# # Calculate total medals per Age_Group
+# total_medals = medal_counts.groupby("Age_Group")["count"].sum().reset_index()
+# total_medals_dict = dict(zip(total_medals["Age_Group"], total_medals["count"]))  # Dictionary for annotation
+
+# # Create bar chart
+# medal_dist = px.bar(
+#     medal_counts, x="Age_Group", y="count", color="Medal",
+#     title="Medals by Age Group",
+#     category_orders={"Medal": ["Gold", "Silver", "Bronze"]},  # Medal order
+#     text=medal_counts["count"],  # Show medal count inside bars
+#     color_discrete_map={"Gold": "#FFD700", "Silver": "#C0C0C0", "Bronze": "#CD7F32"}  # Medal colors
+# )
+
+# # Add total medal count on top of each bar
+# for age_group, total in total_medals_dict.items():
+#     medal_dist.add_annotation(
+#         x=age_group, y=total + 1,  # Position above bar
+#         text=str(total), showarrow=False,
+#         font=dict(size=14, color="black")
+#     )
+
+# st.plotly_chart(medal_dist, use_container_width=True)
+
+# # Enhanced Interpretation
+# st.markdown("### 📋 Statistical Insights")
 # col1, col2 = st.columns(2)
 
 # with col1:
-st.markdown("### 📈 Age Trends Over Time")
-age_trends = px.box(filtered_df, x="Year", y="Age", color="Sex",
-                    title="Age Distribution Across Olympics")
-st.plotly_chart(age_trends, use_container_width=True)
+#     st.markdown("#### Age Distribution Analysis")
+#     mean_age = filtered_df["Age"].mean()
+#     median_age = filtered_df["Age"].median()
+#     mode_age = filtered_df["Age"].mode().iloc[0]
+    
+#     st.write(f"""
+#     - **Mean Age:** {mean_age:.1f} years
+#     - **Median Age:** {median_age:.1f} years
+#     - **Most Common Age:** {mode_age:.0f} years
+#     """)
+    
+#     if mean_age < 25:
+#         st.write("The data suggests a younger athlete population dominates the sport.")
+#     elif mean_age < 30:
+#         st.write("Athletes in their prime (25-30) show strong representation.")
+#     else:
+#         st.write("Experience appears to be a significant factor with older athletes showing strong presence.")
 
 # with col2:
-    # st.markdown("### 🏅 Medal Distribution by Age Group")
-    # filtered_df["Age_Group"] = pd.cut(filtered_df["Age"], 
-    #                                 bins=[0, 20, 25, 30, 35, 100],
-    #                                 labels=["Under 20", "20-25", "26-30", "31-35", "Over 35"])
+#     st.markdown("#### Gender Analysis")
+#     gender_counts = filtered_df["Sex"].value_counts()
+#     st.write(f"""
+#     - **Female Athletes:** {gender_counts.get('F', 0)} ({(gender_counts.get('F', 0) / len(filtered_df) * 100):.1f}%)
+#     - **Male Athletes:** {gender_counts.get('M', 0)} ({(gender_counts.get('M', 0) / len(filtered_df) * 100):.1f}%)
+#     """)
     
-    # medal_dist = px.bar(filtered_df, x="Age_Group", color="Medal",
-    #                    title="Medals by Age Group",
-    #                    category_orders={"Medal": ["Gold", "Silver", "Bronze"]})
-    # st.plotly_chart(medal_dist, use_container_width=True)
-st.markdown("### 🏅 Medal Distribution by Age Group")
-    
-filtered_df["Age_Group"] = pd.cut(filtered_df["Age"], 
-                                    bins=[0, 20, 25, 30, 35, 100],
-                                    labels=["Under 20", "20-25", "26-30", "31-35", "Over 35"])
+#     # Gender-specific age insights
+#     female_mean = filtered_df[filtered_df["Sex"] == "F"]["Age"].mean()
+#     male_mean = filtered_df[filtered_df["Sex"] == "M"]["Age"].mean()
+#     st.write(f"""
+#     - **Average Female Age:** {female_mean:.1f} years
+#     - **Average Male Age:** {male_mean:.1f} years
+#     """)
 
-# Group by Age_Group and Medal, then count medals
-medal_counts = filtered_df.groupby(["Age_Group", "Medal"]).size().reset_index(name="count")
-
-# Calculate total medals per Age_Group
-total_medals = medal_counts.groupby("Age_Group")["count"].sum().reset_index()
-total_medals_dict = dict(zip(total_medals["Age_Group"], total_medals["count"]))  # Dictionary for annotation
-
-# Create bar chart
-medal_dist = px.bar(
-    medal_counts, x="Age_Group", y="count", color="Medal",
-    title="Medals by Age Group",
-    category_orders={"Medal": ["Gold", "Silver", "Bronze"]},  # Medal order
-    text=medal_counts["count"],  # Show medal count inside bars
-    color_discrete_map={"Gold": "#FFD700", "Silver": "#C0C0C0", "Bronze": "#CD7F32"}  # Medal colors
-)
-
-# Add total medal count on top of each bar
-for age_group, total in total_medals_dict.items():
-    medal_dist.add_annotation(
-        x=age_group, y=total + 1,  # Position above bar
-        text=str(total), showarrow=False,
-        font=dict(size=14, color="black")
-    )
-
-st.plotly_chart(medal_dist, use_container_width=True)
-
-# Enhanced Interpretation
-st.markdown("### 📋 Statistical Insights")
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown("#### Age Distribution Analysis")
-    mean_age = filtered_df["Age"].mean()
-    median_age = filtered_df["Age"].median()
-    mode_age = filtered_df["Age"].mode().iloc[0]
-    
-    st.write(f"""
-    - **Mean Age:** {mean_age:.1f} years
-    - **Median Age:** {median_age:.1f} years
-    - **Most Common Age:** {mode_age:.0f} years
-    """)
-    
-    if mean_age < 25:
-        st.write("The data suggests a younger athlete population dominates the sport.")
-    elif mean_age < 30:
-        st.write("Athletes in their prime (25-30) show strong representation.")
-    else:
-        st.write("Experience appears to be a significant factor with older athletes showing strong presence.")
-
-with col2:
-    st.markdown("#### Gender Analysis")
-    gender_counts = filtered_df["Sex"].value_counts()
-    st.write(f"""
-    - **Female Athletes:** {gender_counts.get('F', 0)} ({(gender_counts.get('F', 0) / len(filtered_df) * 100):.1f}%)
-    - **Male Athletes:** {gender_counts.get('M', 0)} ({(gender_counts.get('M', 0) / len(filtered_df) * 100):.1f}%)
-    """)
-    
-    # Gender-specific age insights
-    female_mean = filtered_df[filtered_df["Sex"] == "F"]["Age"].mean()
-    male_mean = filtered_df[filtered_df["Sex"] == "M"]["Age"].mean()
-    st.write(f"""
-    - **Average Female Age:** {female_mean:.1f} years
-    - **Average Male Age:** {male_mean:.1f} years
-    """)
-
-# Display filtered data
-st.markdown("### 📋 Detailed Data View")
-st.dataframe(filtered_df[["Name", "Sex", "Age", "Year", "Event", "Medal", "Event_Type", "Season"]])
+# # Display filtered data
+# st.markdown("### 📋 Detailed Data View")
+# st.dataframe(filtered_df[["Name", "Sex", "Age", "Year", "Event", "Medal", "Event_Type", "Season"]])
 
 
 # Key improvements made in this updated version:

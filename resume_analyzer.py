@@ -67,8 +67,13 @@ st.write(f"""
 """)
 
 # Medal Transition Analysis
+# Medal Transition Analysis
 st.subheader("🥇 Medal Transition Analysis")
 medal_counts = matched_athletes.groupby(['medal_olympic', 'medal_world']).size().reset_index(name='count')
+
+# Calculate specific transitions
+bronze_to_gold = medal_counts[(medal_counts['medal_world'] == 'Bronze') & (medal_counts['medal_olympic'] == 'Gold')]['count'].sum()
+gold_to_bronze = medal_counts[(medal_counts['medal_world'] == 'Gold') & (medal_counts['medal_olympic'] == 'Bronze')]['count'].sum()
 
 fig = px.bar(medal_counts, x="medal_world", y="count", color="medal_olympic",
              labels={"medal_world": "World Medal", "count": "Number of Athletes"},
@@ -76,9 +81,10 @@ fig = px.bar(medal_counts, x="medal_world", y="count", color="medal_olympic",
 st.plotly_chart(fig)
 
 st.markdown("#### **📌 Interpretation**")
-st.write("""
-- A strong transition from **Bronze → Gold** means many athletes improved over time.
-- If many **Gold → Bronze transitions** exist, it indicates that Olympic competition is tougher.
+st.write(f"""
+- **{bronze_to_gold} athletes** improved significantly, upgrading from **Bronze at the World Championships** to **Gold at the Olympics**.  
+- **{gold_to_bronze} athletes** downgraded from **Gold at Worlds to Bronze at the Olympics**, suggesting that Olympic competition is tougher.  
+- If **more athletes upgrade than downgrade**, it shows that many archers refine their skills between the two events.  
 """)
 
 # Age Distribution

@@ -80,7 +80,7 @@ mode_transition_time = valid_time_gaps.mode().iloc[0] if not valid_time_gaps.mod
 unique_athletes_count = matched_athletes['name_olympic'].nunique()  # Unique medalists
 
 # 📌 Interpretation Section
-st.markdown("#### **📌 Interpretation**")
+# st.markdown("#### **📌 Interpretation**")
 st.write(f"""
 - **{transition_percentage:.2f}%** of World Championship medalists later won Olympic medals, showing a strong correlation.
 - The **average transition time** from a World Champion to an Olympic medalist is **{avg_transition_time:.2f} years**.

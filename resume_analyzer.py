@@ -82,7 +82,7 @@ unique_athletes_count = matched_athletes['name_olympic'].nunique()  # Unique med
 # 📌 Interpretation Section
 # st.markdown("#### **📌 Interpretation**")
 st.write(f"""
-- **{transition_percentage:.2f}%** of World Championship medalists later won Olympic medals, showing a strong correlation.
+- **{transition_percentage:.2f}%** of World Championship medalists later won Olympic medals, showing a weak correlation.
 - The **average transition time** from a World Champion to an Olympic medalist is **{avg_transition_time:.2f} years**.
 - The transition time varies from **{min_transition_time} to {max_transition_time} years**, with the most common transition period being **{mode_transition_time} years**.
 - Having **{unique_athletes_count} unique athletes** suggests that some archers won multiple medals over the years.
@@ -222,7 +222,7 @@ st.write("""
 
 st.markdown("### 📌 **Final Insights**")
 st.write(f"""
-- **{success_rate:.2f}%** of World Champions later won Olympic medals, proving strong correlation.
+- **{success_rate:.2f}%** of World Champions later won Olympic medals, proving weak correlation.
 - Countries like **South Korea & USA** produce the most consistent medalists.
 - The **optimal peak age** for Olympic success is **25-30 years**.
 """)
